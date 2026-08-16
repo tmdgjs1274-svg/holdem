@@ -127,7 +127,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v5-multiplayer-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v6-fixes-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -280,17 +280,30 @@
   // ---------- app state ----------
   let roomId = '';
   let names = {}; // 1..MAX_SEATS, null이면 미입장
+  let left = {};  // seat -> true 면 접속 끊김(나감), 다음 대기 상태로 돌아갈 때 정리됨
   for(let i=1;i<=MAX_SEATS;i++) names[i] = null;
   let gameState = {phase:'waiting'};
   const app = document.getElementById('app');
 
   function nameOf(seat){ return names[seat] || `${seat}번 자리`; }
+  // 실제 게임에 참여 가능한(입장했고 나가지 않은) 좌석만
   function connectedSeats(){
+    const out = [];
+    for(let i=1;i<=MAX_SEATS;i++){ if(names[i] && !left[i]) out.push(i); }
+    return out;
+  }
+  // 목록에 표시할 좌석 (나간 사람도 정리 전까지는 계속 표시)
+  function rosterSeats(){
     const out = [];
     for(let i=1;i<=MAX_SEATS;i++){ if(names[i]) out.push(i); }
     return out;
   }
   function joinedCount(){ return connectedSeats().length; }
+  function clearLeftSeats(){
+    Object.keys(left).forEach(seat=>{
+      if(left[seat]){ names[seat] = null; delete left[seat]; }
+    });
+  }
 
   function toggleFullscreen(){
     if(!document.fullscreenElement){
@@ -347,11 +360,19 @@
 
   socket.on('player-joined', ({ seat, name })=>{
     names[seat] = name;
+    delete left[seat];
     socket.emit('host-action', { roomId, state: gameState }); // 새 참가자에게 현재 상태 전달
     render();
   });
   socket.on('player-left', ({ seat })=>{
-    names[seat] = null;
+    if((gameState.phase||'waiting')==='waiting'){
+      // 이미 대기 상태라면 바로 자리 비우기
+      names[seat] = null;
+      delete left[seat];
+    } else {
+      // 게임 진행 중에 나가면 "나감" 표시만 하고, 다음 대기 상태로 돌아갈 때 정리
+      left[seat] = true;
+    }
     render();
   });
   socket.on('player-open-choice', ({ seat, open })=>{
@@ -363,20 +384,23 @@
 
   function kickPlayer(seat){
     names[seat] = null;
+    delete left[seat];
     socket.emit('kick-player', { roomId, seat });
     render();
   }
 
-  // 공개(오픈)한 참가자들 중 최고 족보를 찾아 승자를 계산 (1명만 공개하면 그 사람이 자동 승리, 0명이면 승자 없음)
+  // 공개(오픈)한 참가자들의 족보는 보여주되, 승자는 "모두 공개했을 때만" 계산한다
   function computeWinners(state, openChoice){
-    const openSeats = Object.keys(state.hands).map(Number).filter(seat=>openChoice[seat]);
-    if(openSeats.length===0) return { winners: [], evals: {} };
+    const seats = Object.keys(state.hands).map(Number);
+    const allOpen = seats.length>0 && seats.every(seat=>openChoice[seat]);
     const evals = {};
-    openSeats.forEach(seat=>{ evals[seat] = bestHandAny([...state.hands[seat], ...state.board]); });
-    if(openSeats.length===1) return { winners:[openSeats[0]], evals };
+    seats.forEach(seat=>{
+      if(openChoice[seat]) evals[seat] = bestHandAny([...state.hands[seat], ...state.board]);
+    });
+    if(!allOpen) return { winners: [], evals };
     let bestEv = null;
-    openSeats.forEach(seat=>{ if(!bestEv || compareEval(evals[seat], bestEv)>0) bestEv = evals[seat]; });
-    const winners = openSeats.filter(seat=> compareEval(evals[seat], bestEv)===0);
+    seats.forEach(seat=>{ if(!bestEv || compareEval(evals[seat], bestEv)>0) bestEv = evals[seat]; });
+    const winners = seats.filter(seat=> compareEval(evals[seat], bestEv)===0);
     return { winners, evals };
   }
 
@@ -412,8 +436,8 @@
     const state = gameState || {phase:'waiting'};
     const phase = state.phase || 'waiting';
     const revealCount = REVEAL_COUNT[phase] ?? 0;
-    const seats = connectedSeats();
-    const enoughPlayers = seats.length>=2;
+    const activeSeats = connectedSeats();
+    const enoughPlayers = activeSeats.length>=2;
     const openChoice = state.openChoice || {};
 
     let resultHTML = '';
@@ -423,9 +447,10 @@
 
     function participantRow(seat){
       if(!names[seat]) return '';
+      const isLeft = !!left[seat];
       return `
-        <div class="name-slot connected">
-          <span class="name">${names[seat]}</span>
+        <div class="name-slot ${isLeft ? '' : 'connected'}">
+          <span class="name" style="${isLeft ? 'color:var(--muted); font-weight:400;' : ''}">${names[seat]}${isLeft ? ' (나감)' : ''}</span>
           <span class="exit-link" data-seat="${seat}" style="color:var(--blue-soft); flex-shrink:0; margin-left:8px;">내보내기</span>
         </div>
       `;
@@ -444,7 +469,7 @@
             <div class="hairline"></div>
             <div class="field-label">인원 (${joinedCount()}명 / 최대 ${MAX_SEATS}명)</div>
             <div class="participant-grid">
-              ${seats.map(participantRow).join('')}
+              ${rosterSeats().map(participantRow).join('')}
             </div>
             ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
           </div>
@@ -479,9 +504,10 @@
         let next;
         if(phase==='waiting'){
           if(!enoughPlayers) return;
-          next = dealNewHand(seats);
+          next = dealNewHand(activeSeats);
         } else if(phase==='result'){
           next = {phase:'waiting'};
+          clearLeftSeats(); // 대기 상태로 돌아갈 때 나간 참가자 자리 정리
         } else if(phase==='river'){
           next = {...state, phase:'result'};
         } else {

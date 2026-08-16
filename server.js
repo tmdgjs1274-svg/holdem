@@ -63,6 +63,10 @@ io.on('connection', (socket) => {
       if (typeof cb === 'function') cb({ ok: false, error: '입장 코드를 찾을 수 없어요. 다시 확인해주세요.' });
       return;
     }
+    if ((room.state.phase || 'waiting') !== 'waiting') {
+      if (typeof cb === 'function') cb({ ok: false, error: '게임이 진행 중이에요. 대기 상태일 때 다시 시도해주세요.' });
+      return;
+    }
     let seat = null;
     for (let i = 1; i <= MAX_SEATS; i++) {
       if (!room.players[i]) { seat = i; break; }
