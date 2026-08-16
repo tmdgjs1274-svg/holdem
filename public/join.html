@@ -146,7 +146,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v10-ui-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v13-nextgame-reset-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -320,8 +320,11 @@
   socket.on('state-update', (payload)=>{
     lastState = payload.state;
     names = payload.names || names;
+    // 새 판을 분배할 때는 서버가 모든 좌석의 status를 'open'으로 이미 초기화해서 보내주므로 그걸 그대로 따른다.
     if(lastState.status && lastState.status[mySeat]) myStatus = lastState.status[mySeat];
-    if(lastState.phase==='dealt') myStatus = 'open'; // 새 판이 시작되면 상태 초기화
+    // "다음 게임"을 눌러 대기 상태로 돌아가면 status 필드 자체가 없으므로, 여기서 명시적으로 리셋해준다
+    // (그렇지 않으면 폴드 표시가 다음 판 분배 전까지 계속 남아있게 됨)
+    if(lastState.phase==='waiting') myStatus = 'open';
     if(joined) render();
   });
   socket.on('host-left', ()=>{
