@@ -81,7 +81,6 @@
   .section-label{ font-size:11px; color:var(--muted); letter-spacing:0.15em; margin-bottom:8px; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; }
   .section-label .phase-tag{ color:var(--blue-soft); font-family:'Noto Serif KR', serif; font-size:13px; letter-spacing:0.02em; text-transform:none; font-weight:700; }
   .hand-rank-note{ text-align:center; font-size:13px; color:var(--blue-soft); font-weight:700; margin:-6px 0 12px; }
-  .folded-view{ filter:grayscale(1) brightness(0.75); transition:filter .3s ease; }
   .fold-banner{
     text-align:center; font-family:'Noto Serif KR', serif; font-weight:700; font-size:22px;
     letter-spacing:0.1em; color:#e5e7eb; background:rgba(255,255,255,0.08);
@@ -147,7 +146,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v8-fold-ux-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v10-ui-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -347,6 +346,7 @@
   }
   function doFold(){
     if(myStatus==='folded') return;
+    if(!confirm('폴드하면 이번 판이 끝날 때까지 아무것도 할 수 없어요. 폴드할까요?')) return;
     setStatus('folded');
   }
 
@@ -385,7 +385,7 @@
         <span class="exit-link" id="exitLink">← 나가기</span>
         <span class="seat-badge">${myName}</span>
       </div>
-      <div class="felt-panel ${isFolded ? 'folded-view' : ''}" style="display:flex; flex-direction:column; flex:1;">
+      <div class="felt-panel" style="display:flex; flex-direction:column; flex:1;">
         ${isFolded ? `<div class="fold-banner">🚫 폴드함</div>` : ''}
         <div class="board-section">
           <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
