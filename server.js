@@ -15,7 +15,14 @@ app.get('/join', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'join.html'));
 });
 
-// roomId(4자리 코드) -> { hostId, players: {1,2}, names: {1,2}, state: {...} }
+const MAX_SEATS = 9;
+function emptySeatMap() {
+  const m = {};
+  for (let i = 1; i <= MAX_SEATS; i++) m[i] = null;
+  return m;
+}
+
+// roomId(4자리 코드) -> { hostId, players: {1..9}, names: {1..9}, state: {...} }
 const rooms = {};
 
 // 헷갈리는 문자(0/O, 1/I) 제외한 4자리 코드
@@ -39,8 +46,8 @@ io.on('connection', (socket) => {
     const roomId = genRoomCode();
     rooms[roomId] = {
       hostId: socket.id,
-      players: { 1: null, 2: null },
-      names: { 1: null, 2: null },
+      players: emptySeatMap(),
+      names: emptySeatMap(),
       state: { phase: 'waiting' },
     };
     socket.join(roomId);
@@ -57,10 +64,11 @@ io.on('connection', (socket) => {
       return;
     }
     let seat = null;
-    if (!room.players[1]) seat = 1;
-    else if (!room.players[2]) seat = 2;
+    for (let i = 1; i <= MAX_SEATS; i++) {
+      if (!room.players[i]) { seat = i; break; }
+    }
     if (!seat) {
-      if (typeof cb === 'function') cb({ ok: false, error: '이미 두 명이 입장한 방이에요.' });
+      if (typeof cb === 'function') cb({ ok: false, error: `이미 ${MAX_SEATS}명이 입장한 방이에요.` });
       return;
     }
     const safeName = (name || '').toString().trim().slice(0, 20) || `플레이어${seat}`;

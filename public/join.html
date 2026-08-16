@@ -141,7 +141,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v4-live-toggle-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v5-multiplayer-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -270,15 +270,6 @@
 
   const app = document.getElementById('app');
 
-  function resultInfo(state){
-    const board = state.board;
-    const ev1 = best7([...state.player1, ...board]);
-    const ev2 = best7([...state.player2, ...board]);
-    const cmp = compareEval(ev1, ev2);
-    return { ev1, ev2, label1: categoryLabel(ev1), label2: categoryLabel(ev2), winner: cmp>0?1:(cmp<0?2:0) };
-  }
-  function nameOf(seat){ return names[seat] || `${seat}번 참가자`; }
-
   function renderJoinForm(){
     app.innerHTML = `
       <div class="brand">
@@ -350,7 +341,7 @@
     const state = lastState || {phase:'waiting'};
     const phase = state.phase || 'waiting';
     const revealCount = REVEAL_COUNT[phase] ?? 0;
-    const myCards = mySeat===1 ? state.player1 : state.player2;
+    const myCards = state.hands ? state.hands[mySeat] : null;
 
     let myCardsHTML;
     if(phase==='waiting' || !myCards){
