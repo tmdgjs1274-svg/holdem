@@ -33,7 +33,7 @@
   }
   #app{
     width:100%;
-    max-width:440px;
+    max-width:980px;
     min-height:100vh;
     padding:22px 18px 40px;
     position:relative;
@@ -41,6 +41,11 @@
   .brand{ text-align:center; margin-bottom:22px; }
   .brand .mark{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:26px; letter-spacing:0.02em; color:var(--blue-soft); }
   .brand .sub{ font-size:11px; letter-spacing:0.25em; color:var(--muted); margin-top:4px; text-transform:uppercase; }
+  .host-grid{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+  .host-grid .col-participants{ flex:0 0 300px; min-width:260px; }
+  .host-grid .col-game{ flex:1 1 380px; min-width:300px; }
+  .result-row{ display:flex; gap:16px; flex-wrap:wrap; }
+  .result-row .hand-block{ flex:1; min-width:200px; }
   .felt-panel{
     background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.25));
     border:1px solid rgba(59,130,246,0.35);
@@ -124,7 +129,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v3-showdown-privacy-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v4-landscape-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -280,14 +285,16 @@
 
   function renderLanding(){
     app.innerHTML = `
-      <div class="brand">
-        <div class="mark">진행자 화면</div>
-        <div class="sub" style="text-transform:none; letter-spacing:0.02em; font-size:12px; margin-top:8px;">
-          이 화면은 진행자만 보고, 참가자들에게 보여주지 마세요.
+      <div style="max-width:440px; margin:0 auto;">
+        <div class="brand">
+          <div class="mark">진행자 화면</div>
+          <div class="sub" style="text-transform:none; letter-spacing:0.02em; font-size:12px; margin-top:8px;">
+            이 화면은 진행자만 보고, 참가자들에게 보여주지 마세요.
+          </div>
         </div>
-      </div>
-      <div class="felt-panel">
-        <button class="chip-btn" id="btnHost">방 만들기</button>
+        <div class="felt-panel">
+          <button class="chip-btn" id="btnHost">방 만들기</button>
+        </div>
       </div>
     `;
     document.getElementById('btnHost').onclick = ()=>{
@@ -361,7 +368,7 @@
       banner = `<div class="result-banner warn">아직 승패를 알 수 없어요<span class="hand-name">두 참가자가 모두 카드를 공개해야 승패가 표시됩니다.</span></div>`;
     }
 
-    return banner + seatBlock(1) + seatBlock(2);
+    return banner + `<div class="result-row">${seatBlock(1)}${seatBlock(2)}</div>`;
   }
 
   function renderHost(){
@@ -403,28 +410,33 @@
           이 화면은 진행자만 보고, 참가자들에게 보여주지 마세요.
         </div>
       </div>
-      <div class="felt-panel">
-        <div class="field-label">참가자 접속 코드</div>
-        <div class="code" style="font-size:34px;">${roomId}</div>
-        <button class="copy-btn" id="copyRoomBtn">코드 복사</button>
-        <div class="hairline"></div>
-        <div class="field-label">인원 (${joinedCount()}명)</div>
-        ${participantRow(1)}
-        ${participantRow(2)}
-        ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
-      </div>
-      <div class="hairline"></div>
-      <div class="phase-label">${PHASE_LABEL[phase]}<span class="tag">HOST</span></div>
-      <div class="felt-panel">
-        <div class="board-section">
-          <div class="section-label">커뮤니티 카드</div>
-          <div class="board">${boardHTML(state.board, revealCount)}</div>
+      <div class="host-grid">
+        <div class="col-participants">
+          <div class="felt-panel">
+            <div class="field-label">참가자 접속 코드</div>
+            <div class="code" style="font-size:34px;">${roomId}</div>
+            <button class="copy-btn" id="copyRoomBtn">코드 복사</button>
+            <div class="hairline"></div>
+            <div class="field-label">인원 (${joinedCount()}명)</div>
+            ${participantRow(1)}
+            ${participantRow(2)}
+            ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
+          </div>
         </div>
-        ${resultHTML}
-        ${phase==='waiting' ? `<div class="waiting-note">${anyConnected ? '분배 시작을 누르면 두 참가자에게<br>홀카드 2장씩 지급됩니다.' : ''}</div>` : ''}
-        ${phase==='river' ? `<div class="waiting-note">각 참가자가 카드 공개 여부를 결정하면<br>"게임 종료"를 눌러 결과를 확인하세요.</div>` : ''}
-        <button class="chip-btn" id="actionBtn" ${!anyConnected && phase==='waiting' ? 'disabled' : ''}>${NEXT_ACTION_LABEL[phase]}</button>
+        <div class="col-game">
+          <div class="felt-panel">
+            <div class="phase-label" style="margin-top:0;">${PHASE_LABEL[phase]}<span class="tag">HOST</span></div>
+            <div class="board-section">
+              <div class="section-label">커뮤니티 카드</div>
+              <div class="board">${boardHTML(state.board, revealCount)}</div>
+            </div>
+            ${phase==='waiting' ? `<div class="waiting-note">${anyConnected ? '분배 시작을 누르면 두 참가자에게<br>홀카드 2장씩 지급됩니다.' : ''}</div>` : ''}
+            ${phase==='river' ? `<div class="waiting-note">각 참가자가 카드 공개 여부를 결정하면<br>"게임 종료"를 눌러 결과를 확인하세요.</div>` : ''}
+            <button class="chip-btn" id="actionBtn" ${!anyConnected && phase==='waiting' ? 'disabled' : ''}>${NEXT_ACTION_LABEL[phase]}</button>
+          </div>
+        </div>
       </div>
+      ${resultHTML ? `<div class="hairline"></div><div class="felt-panel">${resultHTML}</div>` : ''}
     `;
     document.getElementById('exitLink').onclick = ()=>{ location.reload(); };
     app.querySelectorAll('[data-seat]').forEach(el=>{

@@ -78,7 +78,9 @@
   .room-tag{ text-align:center; font-size:12px; color:var(--muted); margin-bottom:2px; }
   .phase-label{ text-align:center; font-family:'Noto Serif KR', serif; font-size:19px; font-weight:700; margin:6px 0 12px; color:var(--card-white); }
   .board-section{ margin-bottom:8px; }
-  .section-label{ font-size:11px; color:var(--muted); letter-spacing:0.15em; margin-bottom:8px; text-transform:uppercase; }
+  .section-label{ font-size:11px; color:var(--muted); letter-spacing:0.15em; margin-bottom:8px; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; }
+  .section-label .phase-tag{ color:var(--blue-soft); font-family:'Noto Serif KR', serif; font-size:13px; letter-spacing:0.02em; text-transform:none; font-weight:700; }
+  .hand-rank-note{ text-align:center; font-size:13px; color:var(--blue-soft); font-weight:700; margin:-6px 0 12px; }
   .board{ display:flex; gap:6px; justify-content:center; margin-bottom:8px; }
   .card{ width:48px; height:68px; border-radius:7px; background:var(--card-white); position:relative; box-shadow:0 3px 6px rgba(0,0,0,0.5); flex-shrink:0; }
   .card.big{ width:96px; height:136px; }
@@ -139,7 +141,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v3-showdown-privacy-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v4-live-toggle-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -203,6 +205,24 @@
         if(!best || compareEval(ev,best)>0) best=ev;
       }
     }
+    return best;
+  }
+  // 카드가 5장 이상 몇 장이든(5,6,7장) 그 중 최고의 5장 조합을 찾는다 (참가자 실시간 족보 표시용)
+  function bestHandAny(cardStrs){
+    const cards = cardStrs.map(parseCard);
+    const n = cards.length;
+    if(n===5) return evaluate5(cards);
+    let best=null;
+    const idxs = [];
+    function combo(start, chosen){
+      if(chosen.length===5){
+        const ev = evaluate5(chosen.map(i=>cards[i]));
+        if(!best || compareEval(ev,best)>0) best=ev;
+        return;
+      }
+      for(let i=start;i<n;i++){ combo(i+1, [...chosen, i]); }
+    }
+    combo(0, []);
     return best;
   }
   function categoryLabel(ev){
@@ -341,36 +361,43 @@
       }</div>`;
     }
 
+    // 현재까지 보이는 카드로 만들 수 있는 최고 족보 (내 카드를 직접 보고 있을 때만 표시 - 안 보이면 정보 유출 방지)
+    let handRankHTML = '';
+    if(localReveal && myCards && revealCount>=3){
+      const visibleCards = [...myCards, ...state.board.slice(0, revealCount)];
+      const ev = bestHandAny(visibleCards);
+      handRankHTML = `<div class="hand-rank-note">현재 족보: ${categoryLabel(ev)}</div>`;
+    }
+
     const showViewToggle = phase!=='waiting';
-    const showOpenToggle = phase==='river';
+    const showOpenToggle = phase==='river' || phase==='result';
 
     app.innerHTML = `
       <div class="top-bar">
         <span class="exit-link" id="exitLink">← 나가기</span>
         <span class="seat-badge">${myName}</span>
       </div>
-      <div class="room-tag"><span style="color:var(--blue-soft)">● 연결됨</span></div>
-      <div class="phase-label">${PHASE_LABEL[phase]}</div>
       <div class="felt-panel" style="display:flex; flex-direction:column; flex:1;">
         <div class="board-section">
-          <div class="section-label">커뮤니티 카드</div>
+          <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
           <div class="board">${boardHTML(state.board, revealCount)}</div>
         </div>
 
         <div class="my-hand-hero">
           <div class="who">내 홀카드</div>
+          ${handRankHTML}
           ${myCardsHTML}
           ${showViewToggle ? `<div class="toggle-row"><button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button></div>` : ''}
           ${showOpenToggle ? `
             <div class="open-toggle-wrap">
               <div class="label">쇼다운에서 카드를 공개할까요?</div>
-              <button class="open-toggle-btn ${myOpenChoice?'open':'fold'}" id="openToggleBtn">${myOpenChoice ? '✓ 공개함' : '✕ 공개 안 함 (폴드)'}</button>
+              <button class="open-toggle-btn ${myOpenChoice?'open':'fold'}" id="openToggleBtn">${myOpenChoice ? '✓ 공개함' : '✕ 공개안함'}</button>
             </div>
           ` : ''}
         </div>
 
         ${phase==='waiting' ? `<div class="waiting-note">호스트가 분배를 시작하면<br>홀카드 2장을 받습니다.</div>` : ''}
-        ${phase==='result' ? `<div class="waiting-note">게임이 종료됐어요.<br>결과는 진행자 화면에서 확인할 수 있어요.</div>` : ''}
+        ${phase==='result' ? `<div class="waiting-note">게임이 종료됐어요. 공개 여부는 계속 바꿀 수 있어요.<br>결과는 진행자 화면에서 확인할 수 있어요.</div>` : ''}
       </div>
     `;
     document.getElementById('exitLink').onclick = ()=>{ location.reload(); };
