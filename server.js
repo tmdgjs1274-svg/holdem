@@ -10,26 +10,37 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// roomId -> { hostId, players: {1: socketId|null, 2: socketId|null}, state: {...} }
+// 참가자용 고정 URL
+app.get('/join', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'join.html'));
+});
+
+// roomId(4자리 코드) -> { hostId, players: {1,2}, names: {1,2}, state: {...} }
 const rooms = {};
 
-// 클로드 세션 ID 스타일의 방 코드 생성 (예: hd_014bEjp7MtKgSAMdSuoTLCbC)
-function genRoomId() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const bytes = crypto.randomBytes(24);
-  let id = 'hd_';
-  for (let i = 0; i < 24; i++) {
-    id += chars[bytes[i] % chars.length];
-  }
-  return id;
+// 헷갈리는 문자(0/O, 1/I) 제외한 4자리 코드
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function genRoomCode() {
+  let code;
+  do {
+    const bytes = crypto.randomBytes(4);
+    code = '';
+    for (let i = 0; i < 4; i++) code += CODE_CHARS[bytes[i] % CODE_CHARS.length];
+  } while (rooms[code]); // 충돌 방지
+  return code;
+}
+
+function emitToHost(room, event, payload) {
+  if (room && room.hostId) io.to(room.hostId).emit(event, payload);
 }
 
 io.on('connection', (socket) => {
   socket.on('create-room', (cb) => {
-    const roomId = genRoomId();
+    const roomId = genRoomCode();
     rooms[roomId] = {
       hostId: socket.id,
       players: { 1: null, 2: null },
+      names: { 1: null, 2: null },
       state: { phase: 'waiting' },
     };
     socket.join(roomId);
@@ -38,30 +49,63 @@ io.on('connection', (socket) => {
     if (typeof cb === 'function') cb({ ok: true, roomId });
   });
 
-  socket.on('join-room', ({ roomId, seat }, cb) => {
-    const room = rooms[roomId];
+  socket.on('join-room', ({ roomId, name }, cb) => {
+    const code = (roomId || '').trim().toUpperCase();
+    const room = rooms[code];
     if (!room) {
-      if (typeof cb === 'function') cb({ ok: false, error: '방을 찾을 수 없어요. 코드를 다시 확인해주세요.' });
+      if (typeof cb === 'function') cb({ ok: false, error: '입장 코드를 찾을 수 없어요. 다시 확인해주세요.' });
       return;
     }
-    if (seat !== 1 && seat !== 2) {
-      if (typeof cb === 'function') cb({ ok: false, error: '잘못된 좌석 번호예요.' });
+    let seat = null;
+    if (!room.players[1]) seat = 1;
+    else if (!room.players[2]) seat = 2;
+    if (!seat) {
+      if (typeof cb === 'function') cb({ ok: false, error: '이미 두 명이 입장한 방이에요.' });
       return;
     }
+    const safeName = (name || '').toString().trim().slice(0, 20) || `플레이어${seat}`;
     room.players[seat] = socket.id;
-    socket.join(roomId);
-    socket.data.roomId = roomId;
+    room.names[seat] = safeName;
+    socket.join(code);
+    socket.data.roomId = code;
     socket.data.role = 'player';
     socket.data.seat = seat;
-    if (typeof cb === 'function') cb({ ok: true, state: room.state });
-    io.to(room.hostId).emit('player-joined', { seat });
+
+    if (typeof cb === 'function') cb({ ok: true, seat, state: room.state, names: room.names });
+    emitToHost(room, 'player-joined', { seat, name: safeName });
   });
 
   socket.on('host-action', ({ roomId, state }) => {
     const room = rooms[roomId];
     if (!room || room.hostId !== socket.id) return;
     room.state = state;
-    io.to(roomId).emit('state-update', state);
+    io.to(roomId).emit('state-update', { state: room.state, names: room.names });
+  });
+
+  // 참가자가 리버에서 카드 공개 여부를 바꿀 때 -> 호스트에게 전달
+  socket.on('player-set-open', ({ open }) => {
+    const roomId = socket.data.roomId;
+    const seat = socket.data.seat;
+    if (!roomId || !seat) return;
+    const room = rooms[roomId];
+    if (!room) return;
+    emitToHost(room, 'player-open-choice', { seat, open: !!open });
+  });
+
+  // 호스트가 참가자를 방에서 내보낼 때
+  socket.on('kick-player', ({ roomId, seat }) => {
+    const room = rooms[roomId];
+    if (!room || room.hostId !== socket.id) return;
+    const targetSocketId = room.players[seat];
+    if (!targetSocketId) return;
+    room.players[seat] = null;
+    room.names[seat] = null;
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    if (targetSocket) {
+      targetSocket.emit('kicked');
+      targetSocket.disconnect(true);
+    }
+    io.to(roomId).emit('state-update', { state: room.state, names: room.names });
   });
 
   socket.on('disconnect', () => {
@@ -75,19 +119,19 @@ io.on('connection', (socket) => {
       delete rooms[roomId];
     } else if (socket.data.role === 'player') {
       const seat = socket.data.seat;
-      if (room.players[seat] === socket.id) room.players[seat] = null;
-      io.to(room.hostId).emit('player-left', { seat });
+      if (room.players[seat] === socket.id) {
+        room.players[seat] = null;
+        room.names[seat] = null;
+      }
+      emitToHost(room, 'player-left', { seat });
     }
   });
 });
 
-// 오래된 빈 방 정리 (메모리 누수 방지, 6시간 이상 지난 방)
+// 메모리 누수 방지용 세이프가드
 setInterval(() => {
-  // 간단한 세이프가드: 방 개수가 과도하게 쌓이는 것만 방지 (프로덕션에서는 room.createdAt 기반으로 개선 가능)
   const ids = Object.keys(rooms);
-  if (ids.length > 5000) {
-    ids.slice(0, 1000).forEach((id) => delete rooms[id]);
-  }
+  if (ids.length > 5000) ids.slice(0, 1000).forEach((id) => delete rooms[id]);
 }, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
