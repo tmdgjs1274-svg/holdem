@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>홀덤 분배기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --felt-dark:#0a2e24;
+    --felt-mid:#0f4536;
+    --felt-light:#166147;
+    --rail:#2a1810;
+    --gold:#d4af37;
+    --gold-soft:#f0d68a;
+    --card-white:#faf6ee;
+    --ink:#1c1a16;
+    --suit-red:#a8342a;
+    --muted:rgba(250,246,238,0.62);
+    --danger:#a8342a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Noto Sans KR', -apple-system, sans-serif;
+    background:
+      radial-gradient(ellipse at 50% -10%, var(--felt-light) 0%, var(--felt-mid) 45%, var(--felt-dark) 100%);
+    color:var(--card-white);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:0;
+  }
+  #app{
+    width:100%;
+    max-width:440px;
+    min-height:100vh;
+    padding:22px 18px 40px;
+    position:relative;
+  }
+  .brand{
+    text-align:center;
+    margin-bottom:22px;
+  }
+  .brand .mark{
+    font-family:'Noto Serif KR', serif;
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:0.02em;
+    color:var(--gold-soft);
+  }
+  .brand .sub{
+    font-size:11px;
+    letter-spacing:0.25em;
+    color:var(--muted);
+    margin-top:4px;
+    text-transform:uppercase;
+  }
+  .felt-panel{
+    background:linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.12));
+    border:1px solid rgba(212,175,55,0.35);
+    border-radius:18px;
+    padding:20px 16px;
+    position:relative;
+  }
+  .felt-panel::before{
+    content:'';
+    position:absolute; inset:6px;
+    border:1px dashed rgba(212,175,55,0.28);
+    border-radius:12px;
+    pointer-events:none;
+  }
+  .field-label{
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:8px;
+    display:block;
+    letter-spacing:0.05em;
+  }
+  input[type=text]{
+    width:100%;
+    padding:14px 14px;
+    border-radius:10px;
+    border:1px solid rgba(212,175,55,0.5);
+    background:rgba(0,0,0,0.25);
+    color:var(--card-white);
+    font-size:20px;
+    font-family:'Noto Serif KR', serif;
+    letter-spacing:0.12em;
+    text-align:center;
+    outline:none;
+  }
+  input[type=text]:focus{ border-color:var(--gold); }
+
+  .chip-btn{
+    display:block;
+    width:100%;
+    margin-top:12px;
+    padding:15px 18px;
+    border-radius:999px;
+    border:1px solid var(--gold);
+    background:linear-gradient(180deg, var(--gold-soft), var(--gold) 70%);
+    color:#2a1c05;
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:0.02em;
+    cursor:pointer;
+    box-shadow:0 3px 0 rgba(0,0,0,0.35), 0 6px 14px rgba(0,0,0,0.35);
+    transition:transform .08s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .chip-btn:active{ transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,0.35); }
+  .chip-btn.ghost{
+    background:transparent;
+    color:var(--gold-soft);
+    box-shadow:none;
+    border:1px solid rgba(212,175,55,0.6);
+  }
+  .chip-btn.seat{ margin-top:10px; }
+  .chip-btn:disabled{ opacity:0.4; cursor:default; }
+
+  .row-2{ display:flex; gap:10px; }
+  .row-2 .chip-btn{ margin-top:10px; }
+
+  .hairline{
+    height:1px;
+    background:rgba(212,175,55,0.25);
+    margin:18px 0;
+  }
+
+  .room-tag{
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:2px;
+  }
+  .room-tag b{
+    color:var(--gold-soft);
+    font-family:'Noto Serif KR', serif;
+    font-size:15px;
+    letter-spacing:0.1em;
+  }
+  .phase-label{
+    text-align:center;
+    font-family:'Noto Serif KR', serif;
+    font-size:19px;
+    font-weight:700;
+    margin:6px 0 18px;
+    color:var(--card-white);
+  }
+  .phase-label .tag{
+    display:inline-block;
+    font-family:'Noto Sans KR',sans-serif;
+    font-size:10px;
+    letter-spacing:0.15em;
+    color:var(--felt-dark);
+    background:var(--gold-soft);
+    border-radius:999px;
+    padding:2px 10px;
+    margin-left:8px;
+    vertical-align:middle;
+    font-weight:700;
+  }
+
+  .board-section{ margin-bottom:8px; }
+  .section-label{
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:0.15em;
+    margin-bottom:8px;
+    text-transform:uppercase;
+  }
+  .board{
+    display:flex;
+    gap:6px;
+    justify-content:center;
+    margin-bottom:16px;
+  }
+
+  .card{
+    width:52px; height:74px;
+    border-radius:7px;
+    background:var(--card-white);
+    position:relative;
+    box-shadow:0 3px 6px rgba(0,0,0,0.4);
+    flex-shrink:0;
+  }
+  .card.big{ width:64px; height:90px; }
+  .card.red{ color:var(--suit-red); }
+  .card.black{ color:var(--ink); }
+  .card .corner{
+    position:absolute;
+    font-size:12px;
+    font-weight:700;
+    line-height:1.05;
+    text-align:center;
+    font-family:'Noto Sans KR',sans-serif;
+  }
+  .card.big .corner{ font-size:14px; }
+  .card .corner.top{ top:4px; left:5px; }
+  .card .corner.bottom{ bottom:4px; right:5px; transform:rotate(180deg); }
+  .card .pip{
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    font-size:24px;
+  }
+  .card.big .pip{ font-size:30px; }
+
+  .card-empty{
+    background:transparent;
+    border:1.5px dashed rgba(250,246,238,0.28);
+    box-shadow:none;
+  }
+  .card-back{
+    background:
+      repeating-linear-gradient(135deg, var(--felt-mid) 0 6px, var(--felt-dark) 6px 12px);
+    border:2px solid var(--gold);
+  }
+  .card-back::after{
+    content:'♠';
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px;
+    color:var(--gold-soft);
+    opacity:0.85;
+  }
+
+  .hand-block{ margin-bottom:14px; }
+  .hand-block .who{
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:8px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .hand-block .cards{ display:flex; gap:8px; }
+
+  .toggle-row{
+    display:flex;
+    justify-content:center;
+    margin:10px 0 4px;
+  }
+  .toggle-btn{
+    font-size:12px;
+    padding:8px 16px;
+    border-radius:999px;
+    border:1px solid rgba(212,175,55,0.5);
+    background:rgba(0,0,0,0.2);
+    color:var(--gold-soft);
+    cursor:pointer;
+  }
+
+  .waiting-note{
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+    padding:18px 6px;
+    line-height:1.6;
+  }
+
+  .result-banner{
+    text-align:center;
+    font-family:'Noto Serif KR', serif;
+    font-weight:700;
+    font-size:17px;
+    color:var(--gold-soft);
+    background:rgba(212,175,55,0.12);
+    border:1px solid rgba(212,175,55,0.4);
+    border-radius:12px;
+    padding:12px;
+    margin-bottom:16px;
+  }
+  .result-banner .hand-name{
+    display:block;
+    font-family:'Noto Sans KR',sans-serif;
+    font-weight:400;
+    font-size:12px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+
+  .win-tag{
+    font-size:10px;
+    font-weight:700;
+    padding:2px 8px;
+    border-radius:999px;
+    letter-spacing:0.05em;
+  }
+  .win-tag.win{ background:var(--gold-soft); color:var(--felt-dark); }
+  .win-tag.lose{ background:rgba(255,255,255,0.1); color:var(--muted); }
+
+  .top-bar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .exit-link{
+    font-size:11px;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+  }
+
+  .seat-badge{
+    display:inline-block;
+    font-size:10px;
+    letter-spacing:0.1em;
+    color:var(--felt-dark);
+    background:var(--gold-soft);
+    border-radius:999px;
+    padding:2px 9px;
+    font-weight:700;
+  }
+
+  .hidden{ display:none !important; }
+
+  textarea{
+    width:100%;
+    min-height:64px;
+    padding:10px;
+    border-radius:10px;
+    border:1px solid rgba(212,175,55,0.5);
+    background:rgba(0,0,0,0.25);
+    color:var(--card-white);
+    font-size:10.5px;
+    font-family:'SF Mono', 'Courier New', monospace;
+    line-height:1.4;
+    resize:vertical;
+    word-break:break-all;
+  }
+  textarea::placeholder{ color:rgba(250,246,238,0.35); font-family:'Noto Sans KR',sans-serif; }
+  .copy-btn{
+    font-size:11px;
+    padding:7px 14px;
+    border-radius:999px;
+    border:1px solid var(--gold);
+    background:transparent;
+    color:var(--gold-soft);
+    cursor:pointer;
+    margin-top:8px;
+    display:block;
+  }
+  .connect-step{
+    margin-bottom:14px;
+    padding-bottom:14px;
+    border-bottom:1px dashed rgba(212,175,55,0.2);
+  }
+  .connect-step:last-child{ border-bottom:none; margin-bottom:0; padding-bottom:0; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function(){
+
+  const RANKS = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+  const SUITS = ['S','H','D','C'];
+  const SUIT_SYMBOL = {S:'♠',H:'♥',D:'♦',C:'♣'};
+  const RANK_VALUE = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14};
+  const CATEGORY_NAMES = ['하이 카드','원 페어','투 페어','트리플','스트레이트','플러시','풀 하우스','포카드','스트레이트 플러시'];
+
+  // ---------- deck / evaluation ----------
+  function makeDeck(){
+    const d=[];
+    for(const s of SUITS) for(const r of RANKS) d.push(r+s);
+    return d;
+  }
+  function shuffle(arr){
+    const a=arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+  function dealNewHand(){
+    const deck = shuffle(makeDeck());
+    return {
+      phase:'dealt',
+      player1:[deck[0],deck[1]],
+      player2:[deck[2],deck[3]],
+      board:[deck[4],deck[5],deck[6],deck[7],deck[8]],
+      updatedAt: Date.now()
+    };
+  }
+  function parseCard(str){ return {rank:RANK_VALUE[str[0]], suit:str[1]}; }
+
+  function evaluate5(cards){
+    const ranksSorted = cards.map(c=>c.rank).sort((a,b)=>b-a);
+    const suits = cards.map(c=>c.suit);
+    const isFlush = suits.every(s=>s===suits[0]);
+    const uniqueRanks = [...new Set(ranksSorted)];
+    let straightHigh = null;
+    if(uniqueRanks.length===5){
+      if(uniqueRanks[0]-uniqueRanks[4]===4){
+        straightHigh = uniqueRanks[0];
+      } else if(uniqueRanks[0]===14 && uniqueRanks[1]===5 && uniqueRanks[2]===4 && uniqueRanks[3]===3 && uniqueRanks[4]===2){
+        straightHigh = 5;
+      }
+    }
+    const countMap={};
+    ranksSorted.forEach(r=>countMap[r]=(countMap[r]||0)+1);
+    const groups = Object.entries(countMap).map(([r,c])=>({rank:+r,count:c}))
+      .sort((a,b)=> b.count-a.count || b.rank-a.rank);
+
+    let category, tiebreak;
+    if(isFlush && straightHigh){ category=8; tiebreak=[straightHigh]; }
+    else if(groups[0].count===4){ category=7; tiebreak=[groups[0].rank, groups[1].rank]; }
+    else if(groups[0].count===3 && groups[1] && groups[1].count===2){ category=6; tiebreak=[groups[0].rank, groups[1].rank]; }
+    else if(isFlush){ category=5; tiebreak=ranksSorted.slice(); }
+    else if(straightHigh){ category=4; tiebreak=[straightHigh]; }
+    else if(groups[0].count===3){
+      const kickers=groups.slice(1).map(g=>g.rank).sort((a,b)=>b-a);
+      category=3; tiebreak=[groups[0].rank, ...kickers];
+    }
+    else if(groups[0].count===2 && groups[1] && groups[1].count===2){
+      const pairRanks=[groups[0].rank, groups[1].rank].sort((a,b)=>b-a);
+      const kicker = groups[2].rank;
+      category=2; tiebreak=[pairRanks[0], pairRanks[1], kicker];
+    }
+    else if(groups[0].count===2){
+      const kickers=groups.slice(1).map(g=>g.rank).sort((a,b)=>b-a);
+      category=1; tiebreak=[groups[0].rank, ...kickers];
+    }
+    else{ category=0; tiebreak=ranksSorted.slice(); }
+    return {category, tiebreak};
+  }
+  function compareEval(a,b){
+    if(a.category!==b.category) return a.category-b.category;
+    for(let k=0;k<a.tiebreak.length;k++){
+      const diff=(a.tiebreak[k]||0)-(b.tiebreak[k]||0);
+      if(diff!==0) return diff;
+    }
+    return 0;
+  }
+  function best7(cardStrs7){
+    const cards = cardStrs7.map(parseCard);
+    let best=null;
+    for(let i=0;i<7;i++){
+      for(let j=i+1;j<7;j++){
+        const hand5 = cards.filter((_,idx)=>idx!==i&&idx!==j);
+        const ev = evaluate5(hand5);
+        if(!best || compareEval(ev,best)>0) best=ev;
+      }
+    }
+    return best;
+  }
+  function categoryLabel(ev){
+    if(ev.category===8 && ev.tiebreak[0]===14) return '로열 플러시';
+    return CATEGORY_NAMES[ev.category];
+  }
+
+  function cardHTML(cardStr, opts){
+    opts = opts||{};
+    const big = opts.big ? ' big' : '';
+    if(!cardStr) return `<div class="card card-empty${big}"></div>`;
+    const rank = cardStr[0], suit = cardStr[1];
+    const rankLabel = rank==='T' ? '10' : rank;
+    const symbol = SUIT_SYMBOL[suit];
+    const colorClass = (suit==='H'||suit==='D') ? 'red' : 'black';
+    return `<div class="card ${colorClass}${big}">
+      <div class="corner top">${rankLabel}<br>${symbol}</div>
+      <div class="pip">${symbol}</div>
+      <div class="corner bottom">${rankLabel}<br>${symbol}</div>
+    </div>`;
+  }
+  function cardBackHTML(big){ return `<div class="card card-back${big?' big':''}"></div>`; }
+  function boardHTML(board, revealCount){
+    board = board || [];
+    let out='';
+    for(let i=0;i<5;i++){
+      out += i<revealCount ? cardHTML(board[i]) : `<div class="card card-empty"></div>`;
+    }
+    return out;
+  }
+
+  const PHASE_LABEL = {
+    waiting:'대기 중', dealt:'홀카드 분배 완료', flop:'플랍', turn:'턴', river:'리버', result:'결과'
+  };
+  const REVEAL_COUNT = { waiting:0, dealt:0, flop:3, turn:4, river:5, result:5 };
+  const NEXT_ACTION_LABEL = {
+    waiting:'분배 시작', dealt:'플랍 공개', flop:'턴 공개', turn:'리버 공개', river:'결과 공개', result:'종료'
+  };
+  const NEXT_PHASE = { dealt:'flop', flop:'turn', turn:'river', river:'result' };
+
+  // ---------- Socket.io 연결 ----------
+  const socket = io();
+
+  // ---------- app state ----------
+  let role=null, seat=null;
+  let localReveal = false; // 내 카드 보기 토글 (플레이어 전용, 로컬)
+  let roomId = '';
+  let connected = {1:false, 2:false}; // 호스트 화면: 플레이어별 연결 상태
+  let gameState = {phase:'waiting'};   // 호스트가 들고 있는 원본 상태
+  let lastState = null;                // 플레이어가 받는 상태
+  let playerConnected = false;
+  let joinError = '';
+
+  const app = document.getElementById('app');
+
+  function resultInfo(state){
+    const board = state.board;
+    const ev1 = best7([...state.player1, ...board]);
+    const ev2 = best7([...state.player2, ...board]);
+    const cmp = compareEval(ev1, ev2);
+    return {
+      ev1, ev2,
+      label1: categoryLabel(ev1),
+      label2: categoryLabel(ev2),
+      winner: cmp>0 ? 1 : (cmp<0 ? 2 : 0) // 0 = 무승부
+    };
+  }
+
+  function goLanding(){
+    role=null; seat=null; localReveal=false; roomId=''; joinError='';
+    connected={1:false,2:false}; gameState={phase:'waiting'}; lastState=null; playerConnected=false;
+    renderLanding();
+  }
+
+  function renderLanding(){
+    app.innerHTML = `
+      <div class="brand">
+        <div class="mark">홀덤 분배기</div>
+        <div class="sub">HOLD'EM DEALER</div>
+      </div>
+      <div class="felt-panel">
+        <span class="field-label">호스트</span>
+        <div style="font-size:12px; color:var(--muted); margin:2px 0 10px; line-height:1.5;">
+          방을 만들고 발급된 코드를 플레이어들에게 알려주세요.
+        </div>
+        <button class="chip-btn" id="btnHost">새 방 만들기</button>
+      </div>
+      <div class="hairline"></div>
+      <div class="felt-panel">
+        <span class="field-label">플레이어</span>
+        <div style="font-size:12px; color:var(--muted); margin:2px 0 10px; line-height:1.5;">
+          호스트에게 받은 방 코드를 입력하고 자리를 선택하세요.
+        </div>
+        <input type="text" id="roomInput" placeholder="예: hd_014bEjp7MtKgSAMdSuoTLCbC">
+        <div class="row-2">
+          <button class="chip-btn seat" id="btnP1" style="flex:1">플레이어 1</button>
+          <button class="chip-btn seat" id="btnP2" style="flex:1">플레이어 2</button>
+        </div>
+        <div id="joinErr" style="color:var(--danger); font-size:12px; text-align:center; margin-top:8px;">${joinError}</div>
+      </div>
+    `;
+    document.getElementById('btnHost').onclick = ()=>{
+      const btn = document.getElementById('btnHost');
+      btn.disabled = true; btn.textContent = '방 만드는 중...';
+      socket.emit('create-room', (res)=>{
+        if(res && res.ok){
+          roomId = res.roomId;
+          role = 'host';
+          render();
+        } else {
+          btn.disabled = false; btn.textContent = '새 방 만들기';
+        }
+      });
+    };
+    function tryJoin(seatNum){
+      const val = document.getElementById('roomInput').value.trim();
+      if(!val){ joinError = '방 코드를 입력해주세요.'; renderLanding(); return; }
+      socket.emit('join-room', { roomId: val, seat: seatNum }, (res)=>{
+        if(res && res.ok){
+          roomId = val; role='player'; seat=seatNum; playerConnected=true;
+          lastState = res.state || {phase:'waiting'};
+          render();
+        } else {
+          joinError = (res && res.error) ? res.error : '연결 실패';
+          renderLanding();
+        }
+      });
+    }
+    document.getElementById('btnP1').onclick = ()=> tryJoin(1);
+    document.getElementById('btnP2').onclick = ()=> tryJoin(2);
+  }
+
+  function render(){
+    if(role==='host') renderHost();
+    else if(role==='player') renderPlayer();
+    else renderLanding();
+  }
+
+  // ---------- 호스트 ----------
+  socket.on('player-joined', ({ seat })=>{
+    connected[seat] = true;
+    if(role==='host'){
+      socket.emit('host-action', { roomId, state: gameState }); // 새로 들어온 플레이어에게 현재 상태 전달
+      render();
+    }
+  });
+  socket.on('player-left', ({ seat })=>{
+    connected[seat] = false;
+    if(role==='host') render();
+  });
+
+  function renderHost(){
+    const state = gameState || {phase:'waiting'};
+    const phase = state.phase || 'waiting';
+    const revealCount = REVEAL_COUNT[phase] ?? 0;
+    const anyConnected = connected[1] || connected[2];
+
+    let resultHTML = '';
+    if(phase==='result'){
+      const r = resultInfo(state);
+      const bannerText = r.winner===0 ? '무승부 (스플릿)' : `플레이어 ${r.winner} 승리`;
+      resultHTML = `
+        <div class="result-banner">${bannerText}</div>
+        <div class="hand-block">
+          <div class="who"><span class="seat-badge">P1</span> 플레이어 1 &nbsp;
+            <span class="win-tag ${r.winner===1?'win':'lose'}">${r.label1}</span>
+          </div>
+          <div class="cards">${state.player1.map(c=>cardHTML(c)).join('')}</div>
+        </div>
+        <div class="hand-block">
+          <div class="who"><span class="seat-badge">P2</span> 플레이어 2 &nbsp;
+            <span class="win-tag ${r.winner===2?'win':'lose'}">${r.label2}</span>
+          </div>
+          <div class="cards">${state.player2.map(c=>cardHTML(c)).join('')}</div>
+        </div>
+      `;
+    }
+
+    app.innerHTML = `
+      <div class="top-bar">
+        <span class="exit-link" id="exitLink">← 나가기</span>
+        <span class="seat-badge">호스트</span>
+      </div>
+      <div class="room-tag">방 코드<br><b style="word-break:break-all; font-size:14px;">${roomId}</b>
+        <button id="copyRoomBtn" style="margin-left:6px; font-size:10px; padding:3px 8px; border-radius:999px; border:1px solid var(--gold); background:transparent; color:var(--gold-soft); cursor:pointer;">복사</button>
+      </div>
+      <div class="phase-label">${PHASE_LABEL[phase]}<span class="tag">HOST</span></div>
+      <div class="felt-panel">
+        <div class="section-label">플레이어 연결 상태</div>
+        <div style="display:flex; gap:10px; margin-bottom:4px;">
+          <div style="flex:1; text-align:center; font-size:12px; color:${connected[1]?'#8fd19e':'var(--muted)'}">${connected[1]?'✅ 플레이어 1 연결됨':'⏳ 플레이어 1 대기중'}</div>
+          <div style="flex:1; text-align:center; font-size:12px; color:${connected[2]?'#8fd19e':'var(--muted)'}">${connected[2]?'✅ 플레이어 2 연결됨':'⏳ 플레이어 2 대기중'}</div>
+        </div>
+      </div>
+      <div class="hairline"></div>
+      <div class="felt-panel">
+        <div class="board-section">
+          <div class="section-label">커뮤니티 카드</div>
+          <div class="board">${boardHTML(state.board, revealCount)}</div>
+        </div>
+        ${resultHTML}
+        ${phase==='waiting' ? `<div class="waiting-note">${anyConnected ? '분배 시작을 누르면 두 플레이어에게<br>홀카드 2장씩 지급됩니다.' : '플레이어가 방 코드로 입장할 때까지 기다려주세요.'}</div>` : ''}
+        <button class="chip-btn" id="actionBtn" ${!anyConnected && phase==='waiting' ? 'disabled' : ''}>${NEXT_ACTION_LABEL[phase]}</button>
+      </div>
+    `;
+    document.getElementById('exitLink').onclick = goLanding;
+    document.getElementById('copyRoomBtn').onclick = async ()=>{
+      const btn = document.getElementById('copyRoomBtn');
+      try{ await navigator.clipboard.writeText(roomId); btn.textContent='복사됨'; setTimeout(()=>{ if(btn) btn.textContent='복사'; }, 1500); }
+      catch(e){}
+    };
+    const actionBtn = document.getElementById('actionBtn');
+    if(actionBtn){
+      actionBtn.onclick = ()=>{
+        let next;
+        if(phase==='waiting'){ next = dealNewHand(); }
+        else if(phase==='result'){ next = {phase:'waiting'}; }
+        else { next = {...state, phase: NEXT_PHASE[phase]}; }
+        gameState = next;
+        render();
+        socket.emit('host-action', { roomId, state: next });
+      };
+    }
+  }
+
+  // ---------- 플레이어 ----------
+  socket.on('state-update', (state)=>{
+    if(role==='player'){ lastState = state; render(); }
+  });
+  socket.on('host-left', ()=>{
+    if(role==='player'){
+      joinError = '호스트가 방을 나갔어요.';
+      goLanding();
+    }
+  });
+
+  function renderPlayer(){
+    const state = lastState || {phase:'waiting'};
+    const phase = state.phase || 'waiting';
+    const revealCount = REVEAL_COUNT[phase] ?? 0;
+    const myCards = seat===1 ? state.player1 : state.player2;
+    const oppCards = seat===1 ? state.player2 : state.player1;
+
+    let myCardsHTML;
+    if(phase==='waiting' || !myCards){
+      myCardsHTML = `<div class="cards">${cardBackHTML(true)}${cardBackHTML(true)}</div>`;
+    } else if(phase==='result'){
+      myCardsHTML = `<div class="cards">${myCards.map(c=>cardHTML(c,{big:true})).join('')}</div>`;
+    } else {
+      myCardsHTML = `<div class="cards">${
+        localReveal ? myCards.map(c=>cardHTML(c,{big:true})).join('') : cardBackHTML(true)+cardBackHTML(true)
+      }</div>`;
+    }
+
+    let resultHTML = '';
+    if(phase==='result'){
+      const r = resultInfo(state);
+      const myLabel = seat===1 ? r.label1 : r.label2;
+      const oppLabel = seat===1 ? r.label2 : r.label1;
+      const iWon = r.winner===seat;
+      const isTie = r.winner===0;
+      const bannerText = isTie ? '무승부 (스플릿)' : (iWon ? '승리했습니다' : '패배했습니다');
+      resultHTML = `
+        <div class="result-banner">${bannerText}<span class="hand-name">내 패: ${myLabel}</span></div>
+        <div class="hand-block">
+          <div class="who">상대 플레이어 &nbsp;<span class="win-tag ${!iWon && !isTie ? 'win':'lose'}">${oppLabel}</span></div>
+          <div class="cards">${oppCards.map(c=>cardHTML(c)).join('')}</div>
+        </div>
+      `;
+    }
+
+    const showToggle = phase!=='waiting' && phase!=='result';
+
+    app.innerHTML = `
+      <div class="top-bar">
+        <span class="exit-link" id="exitLink">← 나가기</span>
+        <span class="seat-badge">플레이어 ${seat}</span>
+      </div>
+      <div class="room-tag"><span style="color:#8fd19e">● 연결됨</span></div>
+      <div class="phase-label">${PHASE_LABEL[phase]}</div>
+      <div class="felt-panel">
+        <div class="board-section">
+          <div class="section-label">커뮤니티 카드</div>
+          <div class="board">${boardHTML(state.board, revealCount)}</div>
+        </div>
+        <div class="hairline"></div>
+        <div class="hand-block">
+          <div class="who">내 홀카드</div>
+          ${myCardsHTML}
+        </div>
+        ${showToggle ? `<div class="toggle-row"><button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button></div>` : ''}
+        ${resultHTML}
+        ${phase==='waiting' ? `<div class="waiting-note">호스트가 분배를 시작하면<br>홀카드 2장을 받습니다.</div>` : ''}
+      </div>
+    `;
+    document.getElementById('exitLink').onclick = goLanding;
+    if(showToggle){
+      document.getElementById('toggleBtn').onclick = ()=>{
+        localReveal = !localReveal;
+        render();
+      };
+    }
+  }
+
+  renderLanding();
+})();
+</script>
+</body>
+</html>
