@@ -127,7 +127,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v6-fixes-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v7-fold-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -158,9 +158,9 @@
     const hands = {};
     seats.forEach(seat=>{ hands[seat] = [deck[idx++], deck[idx++]]; });
     const board = deck.slice(idx, idx+5);
-    const openChoice = {};
-    seats.forEach(seat=>{ openChoice[seat] = true; });
-    return { phase:'dealt', hands, board, openChoice };
+    const status = {};
+    seats.forEach(seat=>{ status[seat] = 'open'; }); // 'open'|'closed'|'folded', 기본은 공개
+    return { phase:'dealt', hands, board, status };
   }
   function parseCard(str){ return {rank:RANK_VALUE[str[0]], suit:str[1]}; }
 
@@ -375,9 +375,9 @@
     }
     render();
   });
-  socket.on('player-open-choice', ({ seat, open })=>{
-    gameState.openChoice = gameState.openChoice || {};
-    gameState.openChoice[seat] = open;
+  socket.on('player-status-update', ({ seat, status })=>{
+    gameState.status = gameState.status || {};
+    gameState.status[seat] = status;
     socket.emit('host-action', { roomId, state: gameState });
     render();
   });
@@ -389,36 +389,41 @@
     render();
   }
 
-  // 공개(오픈)한 참가자들의 족보는 보여주되, 승자는 "모두 공개했을 때만" 계산한다
-  function computeWinners(state, openChoice){
+  // 공개(open)한 참가자가 2명 이상일 때만, 그들끼리 비교해서 승자를 계산한다.
+  // 폴드했거나 비공개인 참가자는 원래 순위와 상관없이 비교 대상에서 제외된다.
+  function computeWinners(state, status){
     const seats = Object.keys(state.hands).map(Number);
-    const allOpen = seats.length>0 && seats.every(seat=>openChoice[seat]);
+    const openSeats = seats.filter(seat=> status[seat]==='open');
     const evals = {};
-    seats.forEach(seat=>{
-      if(openChoice[seat]) evals[seat] = bestHandAny([...state.hands[seat], ...state.board]);
-    });
-    if(!allOpen) return { winners: [], evals };
+    openSeats.forEach(seat=>{ evals[seat] = bestHandAny([...state.hands[seat], ...state.board]); });
+    if(openSeats.length<2) return { winners: [], evals, openSeats };
     let bestEv = null;
-    seats.forEach(seat=>{ if(!bestEv || compareEval(evals[seat], bestEv)>0) bestEv = evals[seat]; });
-    const winners = seats.filter(seat=> compareEval(evals[seat], bestEv)===0);
-    return { winners, evals };
+    openSeats.forEach(seat=>{ if(!bestEv || compareEval(evals[seat], bestEv)>0) bestEv = evals[seat]; });
+    const winners = openSeats.filter(seat=> compareEval(evals[seat], bestEv)===0);
+    return { winners, evals, openSeats };
   }
 
-  function hostResultHTML(state, openChoice){
+  // 참가자 상태/결과 패널 - 분배 이후부터 항상 노출. 카드 자체는 phase가 'result'일 때만 실제로 보여준다.
+  function hostStatusPanelHTML(state, showCards){
     const seats = Object.keys(state.hands).map(Number).sort((a,b)=>a-b);
-    const { winners, evals } = computeWinners(state, openChoice);
+    const status = state.status || {};
+    const { winners, evals } = showCards ? computeWinners(state, status) : { winners:[], evals:{} };
 
     function seatBlock(seat){
-      const isOpen = !!openChoice[seat];
+      const st = status[seat] || 'open';
       const isWinner = winners.includes(seat);
-      const cardsHTML = isOpen
+      const cardsHTML = (showCards && st==='open')
         ? `<div class="cards">${state.hands[seat].map(c=>cardHTML(c)).join('')}</div>`
         : `<div class="cards"><div class="card card-empty"></div><div class="card card-empty"></div></div>`;
       let tagHTML;
-      if(isOpen){
+      if(st==='folded'){
+        tagHTML = `<span class="win-tag fold">폴드</span>`;
+      } else if(st==='closed'){
+        tagHTML = `<span class="win-tag fold">비공개</span>`;
+      } else if(showCards){
         tagHTML = `<span class="win-tag category">${categoryLabel(evals[seat])}</span>${isWinner ? ` <span class="win-tag win">WIN</span>` : ''}`;
       } else {
-        tagHTML = `<span class="win-tag fold">비공개</span>`;
+        tagHTML = `<span class="win-tag category">공개 예정</span>`;
       }
       return `
         <div class="hand-block">
@@ -438,11 +443,16 @@
     const revealCount = REVEAL_COUNT[phase] ?? 0;
     const activeSeats = connectedSeats();
     const enoughPlayers = activeSeats.length>=2;
-    const openChoice = state.openChoice || {};
+    const status = state.status || {};
 
-    let resultHTML = '';
-    if(phase==='result'){
-      resultHTML = hostResultHTML(state, openChoice);
+    // 폴드 외(아직 살아있는) 참가자 수 - 딜된 좌석 기준
+    const dealtSeats = state.hands ? Object.keys(state.hands).map(Number) : [];
+    const notFolded = dealtSeats.filter(seat => (status[seat]||'open') !== 'folded');
+    const onlyOneLeft = dealtSeats.length>0 && notFolded.length===1 && phase!=='waiting' && phase!=='result';
+
+    let statusPanelHTML = '';
+    if(dealtSeats.length>0 && phase!=='waiting'){
+      statusPanelHTML = hostStatusPanelHTML(state, phase==='result');
     }
 
     function participantRow(seat){
@@ -455,6 +465,8 @@
         </div>
       `;
     }
+
+    const actionLabel = onlyOneLeft ? '게임 종료' : NEXT_ACTION_LABEL[phase];
 
     app.innerHTML = `
       ${topBarHTML('진행자 화면')}
@@ -482,12 +494,13 @@
               <div class="board">${boardHTML(state.board, revealCount)}</div>
             </div>
             ${phase==='waiting' ? `<div class="waiting-note">${enoughPlayers ? '분배 시작을 누르면 참가자들에게<br>홀카드 2장씩 지급됩니다.' : '최소 2명 이상 입장해야 시작할 수 있어요.'}</div>` : ''}
-            ${phase==='river' ? `<div class="waiting-note">각 참가자가 카드 공개 여부를 결정하면<br>"게임 종료"를 눌러 결과를 확인하세요.</div>` : ''}
-            <button class="chip-btn" id="actionBtn" ${!enoughPlayers && phase==='waiting' ? 'disabled' : ''}>${NEXT_ACTION_LABEL[phase]}</button>
+            ${onlyOneLeft ? `<div class="waiting-note">폴드하지 않은 참가자가 1명 남았어요.<br>"게임 종료"를 누르면 바로 다음 게임으로 넘어갑니다.</div>` : ''}
+            ${!onlyOneLeft && phase==='river' ? `<div class="waiting-note">각 참가자가 카드 공개 여부를 결정하면<br>"게임 종료"를 눌러 결과를 확인하세요.</div>` : ''}
+            <button class="chip-btn" id="actionBtn" ${!enoughPlayers && phase==='waiting' ? 'disabled' : ''}>${actionLabel}</button>
           </div>
         </div>
       </div>
-      ${resultHTML ? `<div class="hairline"></div><div class="felt-panel">${resultHTML}</div>` : ''}
+      ${statusPanelHTML ? `<div class="hairline"></div><div class="felt-panel">${statusPanelHTML}</div>` : ''}
     `;
     bindTopBar();
     app.querySelectorAll('[data-seat]').forEach(el=>{
@@ -502,7 +515,11 @@
     if(actionBtn){
       actionBtn.onclick = ()=>{
         let next;
-        if(phase==='waiting'){
+        if(onlyOneLeft){
+          // 폴드 외 1명만 남으면 결과 화면 없이 바로 대기 상태로
+          next = {phase:'waiting'};
+          clearLeftSeats();
+        } else if(phase==='waiting'){
           if(!enoughPlayers) return;
           next = dealNewHand(activeSeats);
         } else if(phase==='result'){

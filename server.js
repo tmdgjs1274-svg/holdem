@@ -94,14 +94,14 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('state-update', { state: room.state, names: room.names });
   });
 
-  // 참가자가 리버에서 카드 공개 여부를 바꿀 때 -> 호스트에게 전달
-  socket.on('player-set-open', ({ open }) => {
+  // 참가자가 카드 공개/비공개/폴드 상태를 바꿀 때 -> 호스트에게 전달 (status: 'open'|'closed'|'folded')
+  socket.on('player-set-status', ({ status }) => {
     const roomId = socket.data.roomId;
     const seat = socket.data.seat;
     if (!roomId || !seat) return;
     const room = rooms[roomId];
     if (!room) return;
-    emitToHost(room, 'player-open-choice', { seat, open: !!open });
+    emitToHost(room, 'player-status-update', { seat, status });
   });
 
   // 호스트가 참가자를 방에서 내보낼 때

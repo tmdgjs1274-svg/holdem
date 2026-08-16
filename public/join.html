@@ -141,7 +141,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v5-multiplayer-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v7-fold-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -265,7 +265,7 @@
   let names = {1:null, 2:null};
   let lastState = {phase:'waiting'};
   let localReveal = false;   // 내 카드 보기/가리기 (순전히 로컬, 프라이버시용)
-  let myOpenChoice = true;   // 리버에서 쇼다운 공개 여부 (서버로 전송됨)
+  let myStatus = 'open';     // 'open'|'closed'|'folded' - 서버로 전송됨
   let joinError = '';
 
   const app = document.getElementById('app');
@@ -301,7 +301,7 @@
           joined = true; mySeat = res.seat; myName = name;
           lastState = res.state || {phase:'waiting'};
           names = res.names || {1:null,2:null};
-          if(lastState.openChoice) myOpenChoice = !!lastState.openChoice[mySeat];
+          myStatus = (lastState.status && lastState.status[mySeat]) || 'open';
           render();
         } else {
           joinError = (res && res.error) ? res.error : '입장 실패';
@@ -315,7 +315,8 @@
   socket.on('state-update', (payload)=>{
     lastState = payload.state;
     names = payload.names || names;
-    if(lastState.openChoice) myOpenChoice = !!lastState.openChoice[mySeat];
+    if(lastState.status && lastState.status[mySeat]) myStatus = lastState.status[mySeat];
+    if(lastState.phase==='dealt') myStatus = 'open'; // 새 판이 시작되면 상태 초기화
     if(joined) render();
   });
   socket.on('host-left', ()=>{
@@ -329,10 +330,19 @@
     renderJoinForm();
   });
 
-  function toggleOpenChoice(){
-    myOpenChoice = !myOpenChoice;
-    socket.emit('player-set-open', { open: myOpenChoice });
+  function setStatus(status){
+    if(myStatus==='folded') return; // 폴드하면 더 이상 상태를 바꿀 수 없음
+    myStatus = status;
+    socket.emit('player-set-status', { status });
     render();
+  }
+  function toggleOpenChoice(){
+    setStatus(myStatus==='open' ? 'closed' : 'open');
+  }
+  function doFold(){
+    if(myStatus==='folded') return;
+    if(!confirm('폴드하면 이번 판이 끝날 때까지 아무것도 할 수 없어요. 폴드할까요?')) return;
+    setStatus('folded');
   }
 
   function render(){
@@ -361,7 +371,9 @@
     }
 
     const showViewToggle = phase!=='waiting';
-    const showOpenToggle = phase==='river' || phase==='result';
+    const isFolded = myStatus==='folded';
+    const showFoldBtn = phase!=='waiting' && phase!=='result' && !isFolded;
+    const showOpenToggle = (phase==='river' || phase==='result') && !isFolded;
 
     app.innerHTML = `
       <div class="top-bar">
@@ -375,20 +387,26 @@
         </div>
 
         <div class="my-hand-hero">
-          <div class="who">내 홀카드</div>
+          <div class="who">내 홀카드${isFolded ? ' <span class="win-tag fold">폴드함</span>' : ''}</div>
           ${handRankHTML}
           ${myCardsHTML}
           ${showViewToggle ? `<div class="toggle-row"><button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button></div>` : ''}
           ${showOpenToggle ? `
             <div class="open-toggle-wrap">
               <div class="label">쇼다운에서 카드를 공개할까요?</div>
-              <button class="open-toggle-btn ${myOpenChoice?'open':'fold'}" id="openToggleBtn">${myOpenChoice ? '✓ 공개함' : '✕ 공개안함'}</button>
+              <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
+            </div>
+          ` : ''}
+          ${showFoldBtn ? `
+            <div class="open-toggle-wrap">
+              <button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px; margin-top:14px;">폴드</button>
             </div>
           ` : ''}
         </div>
 
         ${phase==='waiting' ? `<div class="waiting-note">호스트가 분배를 시작하면<br>홀카드 2장을 받습니다.</div>` : ''}
-        ${phase==='result' ? `<div class="waiting-note">게임이 종료됐어요. 공개 여부는 계속 바꿀 수 있어요.<br>결과는 진행자 화면에서 확인할 수 있어요.</div>` : ''}
+        ${isFolded && phase!=='result' ? `<div class="waiting-note">폴드했어요. 이번 판이 끝날 때까지 기다려주세요.</div>` : ''}
+        ${phase==='result' ? `<div class="waiting-note">게임이 종료됐어요.${isFolded ? '' : ' 공개 여부는 계속 바꿀 수 있어요.'}<br>결과는 진행자 화면에서 확인할 수 있어요.</div>` : ''}
       </div>
     `;
     document.getElementById('exitLink').onclick = ()=>{ location.reload(); };
@@ -397,6 +415,9 @@
     }
     if(showOpenToggle){
       document.getElementById('openToggleBtn').onclick = toggleOpenChoice;
+    }
+    if(showFoldBtn){
+      document.getElementById('foldBtn').onclick = doFold;
     }
   }
 
