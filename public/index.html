@@ -127,7 +127,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v7-fold-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v9-solo-win-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -396,7 +396,8 @@
     const openSeats = seats.filter(seat=> status[seat]==='open');
     const evals = {};
     openSeats.forEach(seat=>{ evals[seat] = bestHandAny([...state.hands[seat], ...state.board]); });
-    if(openSeats.length<2) return { winners: [], evals, openSeats };
+    if(openSeats.length===0) return { winners: [], evals, openSeats };
+    if(openSeats.length===1) return { winners: [openSeats[0]], evals, openSeats }; // 혼자 남았으면 비교 없이 자동 승리
     let bestEv = null;
     openSeats.forEach(seat=>{ if(!bestEv || compareEval(evals[seat], bestEv)>0) bestEv = evals[seat]; });
     const winners = openSeats.filter(seat=> compareEval(evals[seat], bestEv)===0);
