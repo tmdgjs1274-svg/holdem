@@ -155,48 +155,45 @@
     align-items:center;
     justify-content:center;
   }
-  .view-btn-section{ display:flex; justify-content:center; }
   .err-msg{ color:var(--danger); font-size:12px; text-align:center; margin-top:8px; }
 
   /* 세로모드(기본): 위→아래로 자연스럽게 쌓임 */
   .game-grid{ display:flex; flex-direction:column; gap:10px; }
-  .game-grid .open-area-section:empty, .game-grid .fold-area-section:empty, .game-grid .view-btn-section:empty{ display:none; }
+  .game-grid .open-area-section:empty, .game-grid .fold-area-section:empty{ display:none; }
 
-  /* 가로모드: [커뮤니티카드 | 공개유무] / [내 카드 (전체폭)] / [카드보기버튼 | 폴드버튼] 2x3 그리드 */
+  /* 가로모드: 좌측(커뮤니티카드/공개유무/폴드) · 우측(내 홀카드+카드보기) 2단 컬럼 */
   @media (orientation:landscape) and (max-height:520px){
-    body:not(.mode-portrait) #app{ max-width:860px; }
+    body:not(.mode-portrait) #app{ max-width:760px; }
     body:not(.mode-portrait) .game-grid{
-      display:grid;
-      grid-template-columns:1.2fr 1fr;
-      gap:10px 24px;
-      align-items:start;
+      display:flex;
+      flex-direction:row;
+      align-items:center;
+      gap:20px;
     }
-    body:not(.mode-portrait) .board-section{ grid-column:1; grid-row:1; margin-bottom:0; }
-    body:not(.mode-portrait) .open-area-section{ grid-column:2; grid-row:1; align-items:flex-start; justify-content:center; }
-    body:not(.mode-portrait) .hand-section{ grid-column:1 / span 2; grid-row:2; padding:6px 0; }
-    body:not(.mode-portrait) .view-btn-section{ grid-column:1; grid-row:3; justify-content:flex-start; }
-    body:not(.mode-portrait) .fold-area-section{ grid-column:2; grid-row:3; align-items:flex-start; }
+    body:not(.mode-portrait) .game-col-left{ flex:1.15; display:flex; flex-direction:column; gap:14px; min-width:0; }
+    body:not(.mode-portrait) .game-col-right{ flex:0.85; display:flex; flex-direction:column; align-items:center; min-width:0; }
+    body:not(.mode-portrait) .board-section{ margin-bottom:0; }
     body:not(.mode-portrait) .board{ flex-wrap:nowrap; justify-content:flex-start; gap:5px; }
-    body:not(.mode-portrait) .board .card{ width:44px; height:62px; }
+    body:not(.mode-portrait) .board .card{ width:42px; height:60px; }
     body:not(.mode-portrait) .board .card .corner{ font-size:10px; }
-    body:not(.mode-portrait) .board .card .pip{ font-size:18px; }
+    body:not(.mode-portrait) .board .card .pip{ font-size:17px; }
   }
-  body.mode-landscape #app{ max-width:860px; }
+  body.mode-landscape #app{ max-width:760px; }
   body.mode-landscape .game-grid{
-    display:grid;
-    grid-template-columns:1.2fr 1fr;
-    gap:10px 24px;
-    align-items:start;
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    gap:20px;
   }
-  body.mode-landscape .board-section{ grid-column:1; grid-row:1; margin-bottom:0; }
-  body.mode-landscape .open-area-section{ grid-column:2; grid-row:1; align-items:flex-start; justify-content:center; }
-  body.mode-landscape .hand-section{ grid-column:1 / span 2; grid-row:2; padding:6px 0; }
-  body.mode-landscape .view-btn-section{ grid-column:1; grid-row:3; justify-content:flex-start; }
-  body.mode-landscape .fold-area-section{ grid-column:2; grid-row:3; align-items:flex-start; }
+  body.mode-landscape .game-col-left{ flex:1.15; display:flex; flex-direction:column; gap:14px; min-width:0; }
+  body.mode-landscape .game-col-right{ flex:0.85; display:flex; flex-direction:column; align-items:center; min-width:0; }
+  body.mode-landscape .board-section{ margin-bottom:0; }
   body.mode-landscape .board{ flex-wrap:nowrap; justify-content:flex-start; gap:5px; }
-  body.mode-landscape .board .card{ width:44px; height:62px; }
+  body.mode-landscape .board .card{ width:42px; height:60px; }
   body.mode-landscape .board .card .corner{ font-size:10px; }
-  body.mode-landscape .board .card .pip{ font-size:18px; }
+  body.mode-landscape .board .card .pip{ font-size:17px; }
+  /* 세로모드에서는 좌/우 컬럼 래퍼가 레이아웃에 영향을 주지 않도록(자연스러운 DOM 순서 유지) */
+  .game-col-left, .game-col-right{ display:contents; }
   .layout-toggle-btn{
     font-size:10px; padding:4px 10px; border-radius:999px; border:1px solid rgba(59,130,246,0.5);
     background:rgba(0,0,0,0.3); color:var(--blue-soft); cursor:pointer; flex-shrink:0;
@@ -206,7 +203,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v22-explicitgrid-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v23-simplecol-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -513,38 +510,39 @@
       <div class="felt-panel game-panel">
         ${isFolded ? `<div class="fold-banner">🚫 폴드함</div>` : ''}
         <div class="game-grid">
-          <div class="board-section">
-            <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
-            <div class="board">${boardHTML(state.board, revealCount)}</div>
+          <div class="game-col-left">
+            <div class="board-section">
+              <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
+              <div class="board">${boardHTML(state.board, revealCount)}</div>
+            </div>
+
+            <div class="open-area-section">
+              ${showOpenToggle ? `
+                <div class="open-toggle-wrap">
+                  <div class="label">쇼다운에서 카드를 공개할까요?</div>
+                  <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
+                </div>
+              ` : ''}
+              ${showFoldRevealToggle ? `
+                <div class="open-toggle-wrap">
+                  <div class="label">폴드했지만 카드를 보여줄까요? (승패엔 영향 없음)</div>
+                  <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="fold-area-section">
+              ${showFoldBtn ? `<button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px;">폴드</button>` : ''}
+            </div>
           </div>
 
-          <div class="open-area-section">
-            ${showOpenToggle ? `
-              <div class="open-toggle-wrap">
-                <div class="label">쇼다운에서 카드를 공개할까요?</div>
-                <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
-              </div>
-            ` : ''}
-            ${showFoldRevealToggle ? `
-              <div class="open-toggle-wrap">
-                <div class="label">폴드했지만 카드를 보여줄까요? (승패엔 영향 없음)</div>
-                <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
-              </div>
-            ` : ''}
-          </div>
-
-          <div class="hand-section">
-            <div class="who">내 홀카드</div>
-            ${handRankHTML}
-            ${myCardsHTML}
-          </div>
-
-          <div class="view-btn-section">
-            ${showViewToggle ? `<button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button>` : ''}
-          </div>
-
-          <div class="fold-area-section">
-            ${showFoldBtn ? `<button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px;">폴드</button>` : ''}
+          <div class="game-col-right">
+            <div class="hand-section">
+              <div class="who">내 홀카드</div>
+              ${handRankHTML}
+              ${myCardsHTML}
+              ${showViewToggle ? `<div class="toggle-row"><button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button></div>` : ''}
+            </div>
           </div>
         </div>
 
