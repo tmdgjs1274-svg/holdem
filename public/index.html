@@ -22,6 +22,9 @@
     --danger:#ef4444;
     --lime:#a3e635;
     --lime-dark:#365314;
+    --lime-soft-bg:rgba(163,230,53,0.16);
+    --lime-soft-text:#c8e896;
+    --green-strong:#16a34a;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -86,8 +89,8 @@
     border:1px solid rgba(59,130,246,0.5); background:transparent; color:var(--blue-soft);
   }
   .btn-toggle.active{ background:var(--blue); border-color:var(--blue); color:#04101f; }
-  .position-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--lime); color:var(--lime-dark); letter-spacing:0.05em; }
-  .btn-dot{ display:inline-block; width:11px; height:11px; border-radius:50%; background:var(--lime); box-shadow:0 0 0 2px rgba(163,230,53,0.3); vertical-align:middle; }
+  .position-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--lime-soft-bg); color:var(--lime-soft-text); letter-spacing:0.05em; }
+  .btn-dot{ display:inline-block; width:11px; height:11px; border-radius:50%; background:var(--green-strong); box-shadow:0 0 0 2px rgba(22,163,74,0.35); vertical-align:middle; }
   .code-inline{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:14px; letter-spacing:0.1em; color:var(--blue-soft); margin-left:4px; }
   .more-menu-wrap{ position:relative; }
   .more-btn{ background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px; line-height:1; }
@@ -160,7 +163,7 @@
     opacity:0.65; background:rgba(255,255,255,0.02);
   }
   .hand-block .who{ font-size:12px; color:var(--muted); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
-  .hand-block .cards{ display:flex; gap:8px; }
+  .cards{ display:flex; gap:8px; }
   .waiting-note{ text-align:center; color:var(--muted); font-size:13px; padding:18px 6px; line-height:1.6; }
   .win-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; letter-spacing:0.05em; }
   .win-tag.category{ background:rgba(255,255,255,0.1); color:var(--muted); }
@@ -177,7 +180,7 @@
 <body>
 
 <div id="app" class="host-app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v16-lime-reorder-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v17-colorfix-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
