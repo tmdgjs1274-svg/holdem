@@ -90,16 +90,16 @@
     letter-spacing:0.1em; color:#e5e7eb; background:rgba(255,255,255,0.08);
     border:1px solid rgba(255,255,255,0.25); border-radius:12px; padding:14px; margin-bottom:16px;
   }
-  .board{ display:flex; gap:6px; justify-content:center; margin-bottom:8px; }
-  .card{ width:48px; height:68px; border-radius:7px; background:var(--card-white); position:relative; box-shadow:0 3px 6px rgba(0,0,0,0.5); flex-shrink:0; }
+  .board{ display:flex; gap:7px; justify-content:center; margin-bottom:8px; }
+  .card{ width:58px; height:82px; border-radius:8px; background:var(--card-white); position:relative; box-shadow:0 3px 6px rgba(0,0,0,0.5); flex-shrink:0; }
   .card.big{ width:96px; height:136px; }
   .card.red{ color:var(--suit-red); }
   .card.black{ color:var(--ink); }
-  .card .corner{ position:absolute; font-size:11px; font-weight:700; line-height:1.05; text-align:center; font-family:'Noto Sans KR',sans-serif; }
+  .card .corner{ position:absolute; font-size:13px; font-weight:700; line-height:1.05; text-align:center; font-family:'Noto Sans KR',sans-serif; }
   .card.big .corner{ font-size:19px; }
-  .card .corner.top{ top:4px; left:5px; }
-  .card .corner.bottom{ bottom:4px; right:5px; transform:rotate(180deg); }
-  .card .pip{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:22px; }
+  .card .corner.top{ top:5px; left:6px; }
+  .card .corner.bottom{ bottom:5px; right:6px; transform:rotate(180deg); }
+  .card .pip{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:26px; }
   .card.big .pip{ font-size:44px; }
   .card-empty{ background:transparent; border:1.5px dashed rgba(245,247,251,0.25); box-shadow:none; }
   .card-back{ background: repeating-linear-gradient(135deg, var(--bg-mid) 0 6px, var(--bg-dark) 6px 12px); border:2px solid var(--blue); }
@@ -141,45 +141,70 @@
 
   /* 참가자 화면: 내 홀카드를 화면 중앙에 크게 강조 */
   .hand-section{
-    flex:1;
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    min-height:30vh;
     padding:14px 0 10px;
   }
   .hand-section .who{ font-size:13px; color:var(--muted); margin-bottom:16px; letter-spacing:0.1em; }
   .hand-section .cards{ display:flex; gap:16px; justify-content:center; }
-  .actions-section{
+  .open-area-section, .fold-area-section{
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    padding:10px 0;
   }
+  .view-btn-section{ display:flex; justify-content:center; }
   .err-msg{ color:var(--danger); font-size:12px; text-align:center; margin-top:8px; }
-  .felt-panel.game-panel{ display:flex; flex-direction:column; flex:1; }
+
+  /* 세로모드(기본): 위→아래로 자연스럽게 쌓임 */
+  .game-grid{ display:flex; flex-direction:column; gap:10px; }
+  .game-grid .open-area-section:empty, .game-grid .fold-area-section:empty, .game-grid .view-btn-section:empty{ display:none; }
+
+  /* 가로모드: [커뮤니티카드 | 공개유무] / [내 카드 (전체폭)] / [카드보기버튼 | 폴드버튼] 2x3 그리드 */
   @media (orientation:landscape) and (max-height:520px){
-    body:not(.mode-portrait) .felt-panel.game-panel{ flex-direction:row; align-items:flex-start; gap:14px; }
-    body:not(.mode-portrait) .felt-panel.game-panel .board-section{ flex:1.15 1 0; margin-bottom:0; min-width:0; }
-    body:not(.mode-portrait) .felt-panel.game-panel .hand-section{ flex:0.85 1 0; min-height:auto; padding:0; min-width:0; justify-content:flex-start; }
-    body:not(.mode-portrait) .felt-panel.game-panel .actions-section{ flex:1 1 0; min-width:0; justify-content:flex-start; padding-top:22px; }
-    body:not(.mode-portrait) .felt-panel.game-panel .board{ flex-wrap:nowrap; justify-content:flex-start; margin-bottom:8px; gap:4px; }
-    body:not(.mode-portrait) .felt-panel.game-panel .board .card{ width:34px; height:48px; }
-    body:not(.mode-portrait) .felt-panel.game-panel .board .card .corner{ font-size:9px; }
-    body:not(.mode-portrait) .felt-panel.game-panel .board .card .pip{ font-size:15px; }
-    body:not(.mode-portrait) #app{ max-width:820px; }
+    body:not(.mode-portrait) #app{ max-width:860px; }
+    body:not(.mode-portrait) .game-grid{
+      display:grid;
+      grid-template-columns:1.2fr 1fr;
+      grid-template-areas:
+        "board openarea"
+        "hand hand"
+        "viewbtn foldarea";
+      gap:10px 24px;
+      align-items:start;
+    }
+    body:not(.mode-portrait) .board-section{ grid-area:board; margin-bottom:0; }
+    body:not(.mode-portrait) .open-area-section{ grid-area:openarea; align-items:flex-start; justify-content:center; }
+    body:not(.mode-portrait) .hand-section{ grid-area:hand; padding:6px 0; }
+    body:not(.mode-portrait) .view-btn-section{ grid-area:viewbtn; justify-content:flex-start; }
+    body:not(.mode-portrait) .fold-area-section{ grid-area:foldarea; align-items:flex-start; }
+    body:not(.mode-portrait) .board{ flex-wrap:nowrap; justify-content:flex-start; gap:5px; }
+    body:not(.mode-portrait) .board .card{ width:44px; height:62px; }
+    body:not(.mode-portrait) .board .card .corner{ font-size:10px; }
+    body:not(.mode-portrait) .board .card .pip{ font-size:18px; }
   }
-  body.mode-landscape .felt-panel.game-panel{ flex-direction:row; align-items:flex-start; gap:14px; }
-  body.mode-landscape .felt-panel.game-panel .board-section{ flex:1.15 1 0; margin-bottom:0; min-width:0; }
-  body.mode-landscape .felt-panel.game-panel .hand-section{ flex:0.85 1 0; min-height:auto; padding:0; min-width:0; justify-content:flex-start; }
-  body.mode-landscape .felt-panel.game-panel .actions-section{ flex:1 1 0; min-width:0; justify-content:flex-start; padding-top:22px; }
-  body.mode-landscape .felt-panel.game-panel .board{ flex-wrap:nowrap; justify-content:flex-start; margin-bottom:8px; gap:4px; }
-  body.mode-landscape .felt-panel.game-panel .board .card{ width:34px; height:48px; }
-  body.mode-landscape .felt-panel.game-panel .board .card .corner{ font-size:9px; }
-  body.mode-landscape .felt-panel.game-panel .board .card .pip{ font-size:15px; }
-  body.mode-landscape #app{ max-width:820px; }
+  body.mode-landscape #app{ max-width:860px; }
+  body.mode-landscape .game-grid{
+    display:grid;
+    grid-template-columns:1.2fr 1fr;
+    grid-template-areas:
+      "board openarea"
+      "hand hand"
+      "viewbtn foldarea";
+    gap:10px 24px;
+    align-items:start;
+  }
+  body.mode-landscape .board-section{ grid-area:board; margin-bottom:0; }
+  body.mode-landscape .open-area-section{ grid-area:openarea; align-items:flex-start; justify-content:center; }
+  body.mode-landscape .hand-section{ grid-area:hand; padding:6px 0; }
+  body.mode-landscape .view-btn-section{ grid-area:viewbtn; justify-content:flex-start; }
+  body.mode-landscape .fold-area-section{ grid-area:foldarea; align-items:flex-start; }
+  body.mode-landscape .board{ flex-wrap:nowrap; justify-content:flex-start; gap:5px; }
+  body.mode-landscape .board .card{ width:44px; height:62px; }
+  body.mode-landscape .board .card .corner{ font-size:10px; }
+  body.mode-landscape .board .card .pip{ font-size:18px; }
   .layout-toggle-btn{
     font-size:10px; padding:4px 10px; border-radius:999px; border:1px solid rgba(59,130,246,0.5);
     background:rgba(0,0,0,0.3); color:var(--blue-soft); cursor:pointer; flex-shrink:0;
@@ -189,7 +214,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v18-landscape3col-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v19-grid-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -495,39 +520,41 @@
       </div>
       <div class="felt-panel game-panel">
         ${isFolded ? `<div class="fold-banner">🚫 폴드함</div>` : ''}
-        <div class="board-section">
-          <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
-          <div class="board">${boardHTML(state.board, revealCount)}</div>
-        </div>
+        <div class="game-grid">
+          <div class="board-section">
+            <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
+            <div class="board">${boardHTML(state.board, revealCount)}</div>
+          </div>
 
-        <div class="hand-section">
-          <div class="who">내 홀카드</div>
-          ${handRankHTML}
-          ${myCardsHTML}
-          ${showViewToggle ? `<div class="toggle-row"><button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button></div>` : ''}
-        </div>
+          <div class="open-area-section">
+            ${showOpenToggle ? `
+              <div class="open-toggle-wrap">
+                <div class="label">쇼다운에서 카드를 공개할까요?</div>
+                <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
+              </div>
+            ` : ''}
+            ${showFoldRevealToggle ? `
+              <div class="open-toggle-wrap">
+                <div class="label">폴드했지만 카드를 보여줄까요? (승패엔 영향 없음)</div>
+                <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
+              </div>
+            ` : ''}
+          </div>
 
-        ${(showOpenToggle || showFoldRevealToggle || showFoldBtn) ? `
-        <div class="actions-section">
-          ${showOpenToggle ? `
-            <div class="open-toggle-wrap">
-              <div class="label">쇼다운에서 카드를 공개할까요?</div>
-              <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
-            </div>
-          ` : ''}
-          ${showFoldRevealToggle ? `
-            <div class="open-toggle-wrap">
-              <div class="label">폴드했지만 카드를 보여줄까요? (승패엔 영향 없음)</div>
-              <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
-            </div>
-          ` : ''}
-          ${showFoldBtn ? `
-            <div class="open-toggle-wrap">
-              <button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px; margin-top:14px;">폴드</button>
-            </div>
-          ` : ''}
+          <div class="hand-section">
+            <div class="who">내 홀카드</div>
+            ${handRankHTML}
+            ${myCardsHTML}
+          </div>
+
+          <div class="view-btn-section">
+            ${showViewToggle ? `<button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button>` : ''}
+          </div>
+
+          <div class="fold-area-section">
+            ${showFoldBtn ? `<button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px;">폴드</button>` : ''}
+          </div>
         </div>
-        ` : ''}
 
         ${phase==='waiting' ? `<div class="waiting-note">호스트가 분배를 시작하면<br>홀카드 2장을 받습니다.</div>` : ''}
         ${isFolded && phase!=='result' ? `<div class="waiting-note">이번 판이 끝날 때까지 기다려주세요.</div>` : ''}

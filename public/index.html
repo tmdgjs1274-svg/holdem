@@ -68,6 +68,8 @@
   .participant-card .card-top-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
   .participant-card .name{ font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
   .participant-card .who-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .participant-card .card-body-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .participant-card .tag-col{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
   .result-row{ display:flex; gap:16px; flex-wrap:wrap; }
   .result-row .hand-block{ flex:1; min-width:200px; }
   .participant-grid{ display:flex; flex-direction:column; gap:8px; }
@@ -180,7 +182,7 @@
 <body>
 
 <div id="app" class="host-app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v17-colorfix-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v20-reorder-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -587,7 +589,7 @@
         } else {
           tagHTML = `<span class="win-tag category">공개 예정</span>`;
         }
-        bodyHTML = `<div class="who-row">${tagHTML}</div>${cardsHTML}`;
+        bodyHTML = `<div class="card-body-row">${cardsHTML}<div class="tag-col">${tagHTML}</div></div>`;
       }
 
       return `
@@ -610,17 +612,6 @@
 
     app.innerHTML = `
       ${topBarHTML('진행자 화면', codeHTML)}
-      <div class="felt-panel">
-        <div class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>참가자${showResults ? ' 결과' : ''} &nbsp;<span style="color:var(--muted); font-weight:400;">인원 ${joinedCount()}명 / 최대 ${MAX_SEATS}명</span></span>
-          ${showResults ? `<button class="btn-toggle ${hostRevealAll?'active':''}" id="revealAllBtn" style="font-size:11px;">👁 ${hostRevealAll ? '모든 카드 숨기기' : '모든 카드 보기 (호스트 전용)'}</button>` : ''}
-        </div>
-        <div class="participant-results-grid" id="participantGrid">
-          ${order.map(participantCard).join('')}
-        </div>
-        ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
-      </div>
-      <div class="hairline"></div>
       <div class="felt-panel game-row">
         <div class="board-section">
           <div class="section-label">커뮤니티 카드<span class="phase-tag" style="color:var(--blue-soft); font-family:'Noto Serif KR',serif; font-weight:700; text-transform:none;">${PHASE_LABEL[phase]}</span></div>
@@ -631,6 +622,17 @@
           ${onlyOneLeft ? `<div class="waiting-note" style="padding:0 0 10px;">폴드하지 않은 참가자가 1명 남았어요.</div>` : ''}
           <button class="chip-btn" id="actionBtn" ${!enoughPlayers && phase==='waiting' ? 'disabled' : ''}>${actionLabel}</button>
         </div>
+      </div>
+      <div class="hairline"></div>
+      <div class="felt-panel">
+        <div class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>참가자${showResults ? ' 결과' : ''} &nbsp;<span style="color:var(--muted); font-weight:400;">인원 ${joinedCount()}명 / 최대 ${MAX_SEATS}명</span></span>
+          ${showResults ? `<button class="btn-toggle ${hostRevealAll?'active':''}" id="revealAllBtn" style="font-size:11px;">👁 ${hostRevealAll ? '모든 카드 숨기기' : '모든 카드 보기 (호스트 전용)'}</button>` : ''}
+        </div>
+        <div class="participant-results-grid" id="participantGrid">
+          ${order.map(participantCard).join('')}
+        </div>
+        ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
       </div>
     `;
     bindTopBar();
