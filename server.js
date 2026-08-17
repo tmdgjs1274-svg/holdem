@@ -104,6 +104,16 @@ io.on('connection', (socket) => {
     emitToHost(room, 'player-status-update', { seat, status });
   });
 
+  // 폴드한 참가자가 그래도 카드를 공개하고 싶을 때 (승패에는 영향 없음, 표시용)
+  socket.on('player-set-reveal', ({ reveal }) => {
+    const roomId = socket.data.roomId;
+    const seat = socket.data.seat;
+    if (!roomId || !seat) return;
+    const room = rooms[roomId];
+    if (!room) return;
+    emitToHost(room, 'player-reveal-update', { seat, reveal: !!reveal });
+  });
+
   // 호스트가 참가자를 방에서 내보낼 때
   socket.on('kick-player', ({ roomId, seat }) => {
     const room = rooms[roomId];

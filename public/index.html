@@ -6,6 +6,7 @@
 <title>홀덤 분배기 - 호스트</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js" onerror="window.__sortableLoadFailed=true"></script>
 
 <style>
   :root{
@@ -46,7 +47,39 @@
   .host-grid .col-game{ flex:1 1 380px; min-width:300px; }
   .result-row{ display:flex; gap:16px; flex-wrap:wrap; }
   .result-row .hand-block{ flex:1; min-width:200px; }
-  .participant-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .participant-grid{ display:flex; flex-direction:column; gap:8px; }
+  .name-slot{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:13px; padding:10px 12px; background:rgba(0,0,0,0.25);
+    border-radius:10px; border:1px solid rgba(59,130,246,0.2);
+    gap:8px;
+  }
+  .name-slot .drag-handle{ cursor:grab; color:var(--muted); font-size:14px; flex-shrink:0; touch-action:none; }
+  .name-slot .name-wrap{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+  .name-slot .name{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .name-slot.connected{ border-color:rgba(59,130,246,0.5); }
+  .name-slot .status{ font-size:11px; color:var(--muted); }
+  .name-slot.connected .status{ color:var(--blue-soft); }
+  .name-slot .right-controls{ display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .btn-toggle{
+    font-size:10px; font-weight:700; padding:3px 9px; border-radius:999px; cursor:pointer;
+    border:1px solid rgba(59,130,246,0.5); background:transparent; color:var(--blue-soft);
+  }
+  .btn-toggle.active{ background:var(--blue); border-color:var(--blue); color:#04101f; }
+  .position-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--card-white); letter-spacing:0.05em; }
+  .more-menu-wrap{ position:relative; }
+  .more-btn{ background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px; line-height:1; }
+  .more-dropdown{
+    position:absolute; right:0; top:100%; margin-top:4px; background:var(--bg-mid);
+    border:1px solid rgba(59,130,246,0.4); border-radius:8px; padding:4px; z-index:20;
+    min-width:90px; box-shadow:0 4px 12px rgba(0,0,0,0.5);
+  }
+  .more-dropdown button{
+    display:block; width:100%; text-align:left; background:none; border:none; color:#ffb4b4;
+    font-size:12px; padding:8px 10px; border-radius:6px; cursor:pointer;
+  }
+  .more-dropdown button:hover{ background:rgba(255,255,255,0.06); }
+  .sortable-ghost{ opacity:0.35; }
   .icon-btn{
     width:32px; height:32px; border-radius:8px; border:1px solid rgba(59,130,246,0.4);
     background:rgba(0,0,0,0.3); color:var(--blue-soft); cursor:pointer; font-size:15px;
@@ -100,6 +133,10 @@
   .card .pip{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:24px; }
   .card-empty{ background:transparent; border:1.5px dashed rgba(245,247,251,0.25); box-shadow:none; }
   .hand-block{ margin-bottom:14px; }
+  .hand-block.folded-block{
+    border:1px solid rgba(255,255,255,0.18); border-radius:12px; padding:10px;
+    opacity:0.65; background:rgba(255,255,255,0.02);
+  }
   .hand-block .who{ font-size:12px; color:var(--muted); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
   .hand-block .cards{ display:flex; gap:8px; }
   .waiting-note{ text-align:center; color:var(--muted); font-size:13px; padding:18px 6px; line-height:1.6; }
@@ -112,22 +149,13 @@
   .top-bar .right-group{ display:flex; align-items:center; gap:8px; }
   .exit-link{ font-size:11px; color:var(--muted); text-decoration:underline; cursor:pointer; }
   .seat-badge{ display:inline-block; font-size:10px; letter-spacing:0.1em; color:#04101f; background:var(--blue-soft); border-radius:999px; padding:2px 9px; font-weight:700; }
-  .name-slot{
-    display:flex; justify-content:space-between; align-items:center;
-    font-size:13px; padding:10px 12px; background:rgba(0,0,0,0.25);
-    border-radius:10px; border:1px solid rgba(59,130,246,0.2);
-  }
-  .name-slot .name{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .name-slot.connected{ border-color:rgba(59,130,246,0.5); }
-  .name-slot .status{ font-size:11px; color:var(--muted); }
-  .name-slot.connected .status{ color:var(--blue-soft); }
   .copy-btn{ font-size:11px; padding:7px 14px; border-radius:999px; border:1px solid var(--blue); background:transparent; color:var(--blue-soft); cursor:pointer; flex-shrink:0; }
 </style>
 </head>
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v10-ui-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v14-position-revealall-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -243,6 +271,28 @@
     return CATEGORY_NAMES[ev.category];
   }
 
+  // 버튼(BTN) 기준으로 좌석 순서에 따라 포지션 이름을 배정한다
+  const POSITION_LABELS_BY_COUNT = {
+    2: ['BTN','BB'],
+    3: ['BTN','SB','BB'],
+    4: ['BTN','SB','BB','UTG'],
+    5: ['BTN','SB','BB','UTG','CO'],
+    6: ['BTN','SB','BB','UTG','HJ','CO'],
+    7: ['BTN','SB','BB','UTG','MP','HJ','CO'],
+    8: ['BTN','SB','BB','UTG','UTG+1','MP','HJ','CO'],
+    9: ['BTN','SB','BB','UTG','UTG+1','MP1','MP2','HJ','CO'],
+  };
+  function computePositions(orderedSeats, buttonSeat){
+    const positions = {};
+    if(!buttonSeat || !orderedSeats.includes(buttonSeat) || orderedSeats.length<2) return positions;
+    const n = orderedSeats.length;
+    const labels = POSITION_LABELS_BY_COUNT[n] || POSITION_LABELS_BY_COUNT[9];
+    const startIdx = orderedSeats.indexOf(buttonSeat);
+    const rotated = orderedSeats.slice(startIdx).concat(orderedSeats.slice(0, startIdx));
+    rotated.forEach((seat, i)=>{ if(labels[i]) positions[seat] = labels[i]; });
+    return positions;
+  }
+
   function cardHTML(cardStr, opts){
     opts = opts||{};
     if(!cardStr) return `<div class="card card-empty"></div>`;
@@ -279,11 +329,17 @@
 
   // ---------- app state ----------
   let roomId = '';
+  let hostRevealAll = false; // 호스트 전용: 모든 참가자 카드 미리보기 (참가자에겐 영향 없음, 승패 계산에도 영향 없음)
   let names = {}; // 1..MAX_SEATS, null이면 미입장
   let left = {};  // seat -> true 면 접속 끊김(나감), 다음 대기 상태로 돌아갈 때 정리됨
   for(let i=1;i<=MAX_SEATS;i++) names[i] = null;
-  let gameState = {phase:'waiting'};
+  let gameState = {phase:'waiting', seatOrder:[], buttonSeat:null};
   const app = document.getElementById('app');
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('.more-menu-wrap')){
+      document.querySelectorAll('.more-dropdown').forEach(d=>d.remove());
+    }
+  });
 
   function nameOf(seat){ return names[seat] || `${seat}번 자리`; }
   // 실제 게임에 참여 가능한(입장했고 나가지 않은) 좌석만
@@ -292,17 +348,27 @@
     for(let i=1;i<=MAX_SEATS;i++){ if(names[i] && !left[i]) out.push(i); }
     return out;
   }
-  // 목록에 표시할 좌석 (나간 사람도 정리 전까지는 계속 표시)
+  // 목록에 표시할 좌석 (나간 사람도 정리 전까지는 계속 표시), 번호순
   function rosterSeats(){
     const out = [];
     for(let i=1;i<=MAX_SEATS;i++){ if(names[i]) out.push(i); }
     return out;
+  }
+  // 호스트가 드래그로 지정한 테이블 순서. 새로 입장한 사람은 끝에 추가, 나간 사람은 제거
+  function orderedRosterSeats(){
+    const roster = rosterSeats();
+    gameState.seatOrder = (gameState.seatOrder||[]).filter(s=> roster.includes(s));
+    roster.forEach(s=>{ if(!gameState.seatOrder.includes(s)) gameState.seatOrder.push(s); });
+    return gameState.seatOrder.slice();
   }
   function joinedCount(){ return connectedSeats().length; }
   function clearLeftSeats(){
     Object.keys(left).forEach(seat=>{
       if(left[seat]){ names[seat] = null; delete left[seat]; }
     });
+  }
+  function broadcastGameState(){
+    socket.emit('host-action', { roomId, state: gameState });
   }
 
   function toggleFullscreen(){
@@ -378,14 +444,41 @@
   socket.on('player-status-update', ({ seat, status })=>{
     gameState.status = gameState.status || {};
     gameState.status[seat] = status;
-    socket.emit('host-action', { roomId, state: gameState });
+    broadcastGameState();
+    render();
+  });
+  socket.on('player-reveal-update', ({ seat, reveal })=>{
+    gameState.reveal = gameState.reveal || {};
+    gameState.reveal[seat] = reveal;
+    broadcastGameState();
     render();
   });
 
   function kickPlayer(seat){
     names[seat] = null;
     delete left[seat];
+    if(gameState.buttonSeat === seat) gameState.buttonSeat = null;
     socket.emit('kick-player', { roomId, seat });
+    render();
+  }
+  function setButtonSeat(seat){
+    gameState.buttonSeat = (gameState.buttonSeat === seat) ? null : seat;
+    broadcastGameState();
+    render();
+  }
+  function moveSeat(seat, direction){
+    const order = orderedRosterSeats();
+    const idx = order.indexOf(seat);
+    const newIdx = idx + direction;
+    if(newIdx<0 || newIdx>=order.length) return;
+    [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
+    gameState.seatOrder = order;
+    broadcastGameState();
+    render();
+  }
+  function reorderSeats(newOrder){
+    gameState.seatOrder = newOrder;
+    broadcastGameState();
     render();
   }
 
@@ -405,20 +498,29 @@
   }
 
   // 참가자 상태/결과 패널 - 분배 이후부터 항상 노출. 카드 자체는 phase가 'result'일 때만 실제로 보여준다.
-  function hostStatusPanelHTML(state, showCards){
+  function hostStatusPanelHTML(state, showCards, revealAll){
     const seats = Object.keys(state.hands).map(Number).sort((a,b)=>a-b);
     const status = state.status || {};
+    const reveal = state.reveal || {};
+    const positions = computePositions(orderedRosterSeats(), state.buttonSeat);
     const { winners, evals } = showCards ? computeWinners(state, status) : { winners:[], evals:{} };
 
     function seatBlock(seat){
       const st = status[seat] || 'open';
       const isWinner = winners.includes(seat);
-      const cardsHTML = (showCards && st==='open')
+      const isFolded = st==='folded';
+      const foldRevealed = isFolded && !!reveal[seat];
+      // 호스트가 "모든 카드 보기"를 켰으면 상태와 무관하게 카드를 보여준다 (승패 계산에는 영향 없음, 호스트만 보임)
+      const showActualCards = revealAll || (showCards && (st==='open' || foldRevealed));
+      const cardsHTML = showActualCards
         ? `<div class="cards">${state.hands[seat].map(c=>cardHTML(c)).join('')}</div>`
         : `<div class="cards"><div class="card card-empty"></div><div class="card card-empty"></div></div>`;
+      const posTag = positions[seat] ? `<span class="position-tag">${positions[seat]}</span> ` : '';
       let tagHTML;
-      if(st==='folded'){
-        tagHTML = `<span class="win-tag fold">폴드</span>`;
+      if(isFolded){
+        tagHTML = foldRevealed
+          ? `<span class="win-tag fold">폴드 (공개)</span>${showCards ? ` <span class="win-tag category">${categoryLabel(bestHandAny([...state.hands[seat], ...state.board]))}</span>` : ''}`
+          : `<span class="win-tag fold">폴드</span>`;
       } else if(st==='closed'){
         tagHTML = `<span class="win-tag fold">비공개</span>`;
       } else if(showCards){
@@ -427,8 +529,8 @@
         tagHTML = `<span class="win-tag category">공개 예정</span>`;
       }
       return `
-        <div class="hand-block">
-          <div class="who">${nameOf(seat)} &nbsp; ${tagHTML}</div>
+        <div class="hand-block ${isFolded ? 'folded-block' : ''}">
+          <div class="who">${posTag}${nameOf(seat)} &nbsp; ${tagHTML}</div>
           ${cardsHTML}
         </div>
       `;
@@ -445,6 +547,9 @@
     const activeSeats = connectedSeats();
     const enoughPlayers = activeSeats.length>=2;
     const status = state.status || {};
+    const order = orderedRosterSeats();
+    const positions = computePositions(order, state.buttonSeat);
+    const dragOk = typeof Sortable !== 'undefined';
 
     // 폴드 외(아직 살아있는) 참가자 수 - 딜된 좌석 기준
     const dealtSeats = state.hands ? Object.keys(state.hands).map(Number) : [];
@@ -453,16 +558,33 @@
 
     let statusPanelHTML = '';
     if(dealtSeats.length>0 && phase!=='waiting'){
-      statusPanelHTML = hostStatusPanelHTML(state, phase==='result');
+      statusPanelHTML = hostStatusPanelHTML(state, phase==='result', hostRevealAll);
     }
+    const showRevealAllToggle = dealtSeats.length>0 && phase!=='waiting';
 
-    function participantRow(seat){
+    function participantRow(seat, idx){
       if(!names[seat]) return '';
       const isLeft = !!left[seat];
+      const isButton = state.buttonSeat === seat;
+      const posTag = positions[seat] ? `<span class="position-tag">${positions[seat]}</span>` : '';
       return `
-        <div class="name-slot ${isLeft ? '' : 'connected'}">
-          <span class="name" style="${isLeft ? 'color:var(--muted); font-weight:400;' : ''}">${names[seat]}${isLeft ? ' (나감)' : ''}</span>
-          <span class="exit-link" data-seat="${seat}" style="color:var(--blue-soft); flex-shrink:0; margin-left:8px;">내보내기</span>
+        <div class="name-slot ${isLeft ? '' : 'connected'}" data-seat="${seat}">
+          ${dragOk ? `<span class="drag-handle">⠿</span>` : `
+            <span style="display:flex; flex-direction:column; gap:2px;">
+              <button class="icon-btn" style="width:20px; height:16px; font-size:10px;" data-move="-1" data-seat="${seat}" ${idx===0?'disabled':''}>▲</button>
+              <button class="icon-btn" style="width:20px; height:16px; font-size:10px;" data-move="1" data-seat="${seat}" ${idx===order.length-1?'disabled':''}>▼</button>
+            </span>
+          `}
+          <div class="name-wrap">
+            ${posTag}
+            <span class="name" style="${isLeft ? 'color:var(--muted); font-weight:400;' : ''}">${names[seat]}${isLeft ? ' (나감)' : ''}</span>
+          </div>
+          <div class="right-controls">
+            <button class="btn-toggle ${isButton?'active':''}" data-btnseat="${seat}">BTN</button>
+            <div class="more-menu-wrap">
+              <button class="more-btn" data-more="${seat}">⋯</button>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -481,8 +603,8 @@
             </div>
             <div class="hairline"></div>
             <div class="field-label">인원 (${joinedCount()}명 / 최대 ${MAX_SEATS}명)</div>
-            <div class="participant-grid">
-              ${rosterSeats().map(participantRow).join('')}
+            <div class="participant-grid" id="participantGrid">
+              ${order.map(participantRow).join('')}
             </div>
             ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
           </div>
@@ -495,18 +617,67 @@
               <div class="board">${boardHTML(state.board, revealCount)}</div>
             </div>
             ${phase==='waiting' ? `<div class="waiting-note">${enoughPlayers ? '분배 시작을 누르면 참가자들에게<br>홀카드 2장씩 지급됩니다.' : '최소 2명 이상 입장해야 시작할 수 있어요.'}</div>` : ''}
-            ${onlyOneLeft ? `<div class="waiting-note">폴드하지 않은 참가자가 1명 남았어요.<br>"게임 종료"를 누르면 바로 다음 게임으로 넘어갑니다.</div>` : ''}
+            ${onlyOneLeft ? `<div class="waiting-note">폴드하지 않은 참가자가 1명 남았어요.<br>"게임 종료"를 누르면 카드 공개 여부를 확인할 수 있어요.</div>` : ''}
             ${!onlyOneLeft && phase==='river' ? `<div class="waiting-note">각 참가자가 카드 공개 여부를 결정하면<br>"게임 종료"를 눌러 결과를 확인하세요.</div>` : ''}
             <button class="chip-btn" id="actionBtn" ${!enoughPlayers && phase==='waiting' ? 'disabled' : ''}>${actionLabel}</button>
           </div>
         </div>
       </div>
-      ${statusPanelHTML ? `<div class="hairline"></div><div class="felt-panel">${statusPanelHTML}</div>` : ''}
+      ${statusPanelHTML ? `<div class="hairline"></div><div class="felt-panel">
+        ${showRevealAllToggle ? `
+          <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+            <button class="btn-toggle ${hostRevealAll?'active':''}" id="revealAllBtn" style="padding:6px 12px; font-size:11px;">👁 ${hostRevealAll ? '모든 카드 숨기기' : '모든 카드 보기 (호스트 전용)'}</button>
+          </div>
+        ` : ''}
+        ${statusPanelHTML}
+      </div>` : ''}
     `;
     bindTopBar();
-    app.querySelectorAll('[data-seat]').forEach(el=>{
-      el.onclick = ()=> kickPlayer(parseInt(el.dataset.seat,10));
+
+    // 더보기(⋯) 메뉴 - 내보내기
+    app.querySelectorAll('[data-more]').forEach(el=>{
+      el.onclick = (e)=>{
+        e.stopPropagation();
+        const seat = parseInt(el.dataset.more,10);
+        const existing = el.parentElement.querySelector('.more-dropdown');
+        document.querySelectorAll('.more-dropdown').forEach(d=>d.remove());
+        if(existing) return; // 토글: 이미 열려있었으면 닫기만 하고 종료
+        const dropdown = document.createElement('div');
+        dropdown.className = 'more-dropdown';
+        dropdown.innerHTML = `<button data-kick="${seat}">내보내기</button>`;
+        el.parentElement.appendChild(dropdown);
+        dropdown.querySelector('[data-kick]').onclick = (e2)=>{ e2.stopPropagation(); kickPlayer(seat); };
+      };
     });
+    document.querySelectorAll('.more-dropdown').forEach(d=>d.remove()); // 매 렌더링시 정리
+
+    // BTN(버튼) 지정
+    app.querySelectorAll('[data-btnseat]').forEach(el=>{
+      el.onclick = ()=> setButtonSeat(parseInt(el.dataset.btnseat,10));
+    });
+
+    // 순서 변경: Sortable 사용 가능하면 드래그, 아니면 위/아래 버튼
+    const gridEl = document.getElementById('participantGrid');
+    if(dragOk && gridEl){
+      Sortable.create(gridEl, {
+        handle: '.drag-handle',
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        onEnd: ()=>{
+          const newOrder = Array.from(gridEl.children).map(el=>parseInt(el.dataset.seat,10));
+          reorderSeats(newOrder);
+        }
+      });
+    } else {
+      app.querySelectorAll('[data-move]').forEach(el=>{
+        el.onclick = ()=> moveSeat(parseInt(el.dataset.seat,10), parseInt(el.dataset.move,10));
+      });
+    }
+
+    const revealAllBtn = document.getElementById('revealAllBtn');
+    if(revealAllBtn){
+      revealAllBtn.onclick = ()=>{ hostRevealAll = !hostRevealAll; render(); };
+    }
     document.getElementById('copyRoomBtn').onclick = async ()=>{
       const btn = document.getElementById('copyRoomBtn');
       try{ await navigator.clipboard.writeText(roomId); btn.textContent='복사됨'; setTimeout(()=>{ if(btn) btn.textContent='코드 복사'; }, 1500); }
@@ -517,14 +688,14 @@
       actionBtn.onclick = ()=>{
         let next;
         if(onlyOneLeft){
-          // 폴드 외 1명만 남으면 결과 화면 없이 바로 대기 상태로
-          next = {phase:'waiting'};
-          clearLeftSeats();
+          // 폴드 외 1명만 남아도 결과 화면으로 넘어가 카드 공개 기회를 준다
+          next = {...state, phase:'result'};
         } else if(phase==='waiting'){
           if(!enoughPlayers) return;
           next = dealNewHand(activeSeats);
+          next.seatOrder = state.seatOrder; next.buttonSeat = state.buttonSeat;
         } else if(phase==='result'){
-          next = {phase:'waiting'};
+          next = {phase:'waiting', seatOrder: state.seatOrder, buttonSeat: state.buttonSeat};
           clearLeftSeats(); // 대기 상태로 돌아갈 때 나간 참가자 자리 정리
         } else if(phase==='river'){
           next = {...state, phase:'result'};

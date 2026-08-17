@@ -266,11 +266,33 @@
 
   const socket = io();
 
+  const POSITION_LABELS_BY_COUNT = {
+    2: ['BTN','BB'],
+    3: ['BTN','SB','BB'],
+    4: ['BTN','SB','BB','UTG'],
+    5: ['BTN','SB','BB','UTG','CO'],
+    6: ['BTN','SB','BB','UTG','HJ','CO'],
+    7: ['BTN','SB','BB','UTG','MP','HJ','CO'],
+    8: ['BTN','SB','BB','UTG','UTG+1','MP','HJ','CO'],
+    9: ['BTN','SB','BB','UTG','UTG+1','MP1','MP2','HJ','CO'],
+  };
+  function computePositions(orderedSeats, buttonSeat){
+    const positions = {};
+    if(!buttonSeat || !orderedSeats.includes(buttonSeat) || orderedSeats.length<2) return positions;
+    const n = orderedSeats.length;
+    const labels = POSITION_LABELS_BY_COUNT[n] || POSITION_LABELS_BY_COUNT[9];
+    const startIdx = orderedSeats.indexOf(buttonSeat);
+    const rotated = orderedSeats.slice(startIdx).concat(orderedSeats.slice(0, startIdx));
+    rotated.forEach((seat, i)=>{ if(labels[i]) positions[seat] = labels[i]; });
+    return positions;
+  }
+
   let joined = false, mySeat = null, myName = '';
   let names = {1:null, 2:null};
   let lastState = {phase:'waiting'};
   let localReveal = false;   // 내 카드 보기/가리기 (순전히 로컬, 프라이버시용)
   let myStatus = 'open';     // 'open'|'closed'|'folded' - 서버로 전송됨
+  let myFoldReveal = false;  // 폴드했어도 카드를 보여줄지 (승패엔 영향 없음)
   let joinError = '';
 
   const app = document.getElementById('app');
@@ -322,9 +344,9 @@
     names = payload.names || names;
     // 새 판을 분배할 때는 서버가 모든 좌석의 status를 'open'으로 이미 초기화해서 보내주므로 그걸 그대로 따른다.
     if(lastState.status && lastState.status[mySeat]) myStatus = lastState.status[mySeat];
-    // "다음 게임"을 눌러 대기 상태로 돌아가면 status 필드 자체가 없으므로, 여기서 명시적으로 리셋해준다
-    // (그렇지 않으면 폴드 표시가 다음 판 분배 전까지 계속 남아있게 됨)
-    if(lastState.phase==='waiting') myStatus = 'open';
+    if(lastState.reveal && typeof lastState.reveal[mySeat] !== 'undefined') myFoldReveal = !!lastState.reveal[mySeat];
+    // "다음 게임"을 눌러 대기 상태로 돌아가면 status/reveal 필드 자체가 없으므로, 여기서 명시적으로 리셋해준다
+    if(lastState.phase==='waiting'){ myStatus = 'open'; myFoldReveal = false; }
     if(joined) render();
   });
   socket.on('host-left', ()=>{
@@ -351,6 +373,11 @@
     if(myStatus==='folded') return;
     if(!confirm('폴드하면 이번 판이 끝날 때까지 아무것도 할 수 없어요. 폴드할까요?')) return;
     setStatus('folded');
+  }
+  function toggleFoldReveal(){
+    myFoldReveal = !myFoldReveal;
+    socket.emit('player-set-reveal', { reveal: myFoldReveal });
+    render();
   }
 
   function render(){
@@ -382,11 +409,17 @@
     const isFolded = myStatus==='folded';
     const showFoldBtn = phase!=='waiting' && phase!=='result' && !isFolded;
     const showOpenToggle = (phase==='river' || phase==='result') && !isFolded;
+    const showFoldRevealToggle = isFolded && phase!=='waiting';
+
+    // 내 포지션 (호스트가 BTN을 지정한 경우에만 표시됨)
+    const myPosition = state.seatOrder && state.buttonSeat
+      ? (computePositions(state.seatOrder, state.buttonSeat)[mySeat] || '')
+      : '';
 
     app.innerHTML = `
       <div class="top-bar">
         <span class="exit-link" id="exitLink">← 나가기</span>
-        <span class="seat-badge">${myName}</span>
+        <span class="seat-badge">${myName}${myPosition ? ` · ${myPosition}` : ''}</span>
       </div>
       <div class="felt-panel" style="display:flex; flex-direction:column; flex:1;">
         ${isFolded ? `<div class="fold-banner">🚫 폴드함</div>` : ''}
@@ -404,6 +437,12 @@
             <div class="open-toggle-wrap">
               <div class="label">쇼다운에서 카드를 공개할까요?</div>
               <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
+            </div>
+          ` : ''}
+          ${showFoldRevealToggle ? `
+            <div class="open-toggle-wrap">
+              <div class="label">폴드했지만 카드를 보여줄까요? (승패엔 영향 없음)</div>
+              <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
             </div>
           ` : ''}
           ${showFoldBtn ? `
@@ -427,6 +466,9 @@
     }
     if(showFoldBtn){
       document.getElementById('foldBtn').onclick = doFold;
+    }
+    if(showFoldRevealToggle){
+      document.getElementById('foldRevealBtn').onclick = toggleFoldReveal;
     }
   }
 
