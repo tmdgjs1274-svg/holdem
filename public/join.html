@@ -168,18 +168,14 @@
     body:not(.mode-portrait) .game-grid{
       display:grid;
       grid-template-columns:1.2fr 1fr;
-      grid-template-areas:
-        "board openarea"
-        "hand hand"
-        "viewbtn foldarea";
       gap:10px 24px;
       align-items:start;
     }
-    body:not(.mode-portrait) .board-section{ grid-area:board; margin-bottom:0; }
-    body:not(.mode-portrait) .open-area-section{ grid-area:openarea; align-items:flex-start; justify-content:center; }
-    body:not(.mode-portrait) .hand-section{ grid-area:hand; padding:6px 0; }
-    body:not(.mode-portrait) .view-btn-section{ grid-area:viewbtn; justify-content:flex-start; }
-    body:not(.mode-portrait) .fold-area-section{ grid-area:foldarea; align-items:flex-start; }
+    body:not(.mode-portrait) .board-section{ grid-column:1; grid-row:1; margin-bottom:0; }
+    body:not(.mode-portrait) .open-area-section{ grid-column:2; grid-row:1; align-items:flex-start; justify-content:center; }
+    body:not(.mode-portrait) .hand-section{ grid-column:1 / span 2; grid-row:2; padding:6px 0; }
+    body:not(.mode-portrait) .view-btn-section{ grid-column:1; grid-row:3; justify-content:flex-start; }
+    body:not(.mode-portrait) .fold-area-section{ grid-column:2; grid-row:3; align-items:flex-start; }
     body:not(.mode-portrait) .board{ flex-wrap:nowrap; justify-content:flex-start; gap:5px; }
     body:not(.mode-portrait) .board .card{ width:44px; height:62px; }
     body:not(.mode-portrait) .board .card .corner{ font-size:10px; }
@@ -189,18 +185,14 @@
   body.mode-landscape .game-grid{
     display:grid;
     grid-template-columns:1.2fr 1fr;
-    grid-template-areas:
-      "board openarea"
-      "hand hand"
-      "viewbtn foldarea";
     gap:10px 24px;
     align-items:start;
   }
-  body.mode-landscape .board-section{ grid-area:board; margin-bottom:0; }
-  body.mode-landscape .open-area-section{ grid-area:openarea; align-items:flex-start; justify-content:center; }
-  body.mode-landscape .hand-section{ grid-area:hand; padding:6px 0; }
-  body.mode-landscape .view-btn-section{ grid-area:viewbtn; justify-content:flex-start; }
-  body.mode-landscape .fold-area-section{ grid-area:foldarea; align-items:flex-start; }
+  body.mode-landscape .board-section{ grid-column:1; grid-row:1; margin-bottom:0; }
+  body.mode-landscape .open-area-section{ grid-column:2; grid-row:1; align-items:flex-start; justify-content:center; }
+  body.mode-landscape .hand-section{ grid-column:1 / span 2; grid-row:2; padding:6px 0; }
+  body.mode-landscape .view-btn-section{ grid-column:1; grid-row:3; justify-content:flex-start; }
+  body.mode-landscape .fold-area-section{ grid-column:2; grid-row:3; align-items:flex-start; }
   body.mode-landscape .board{ flex-wrap:nowrap; justify-content:flex-start; gap:5px; }
   body.mode-landscape .board .card{ width:44px; height:62px; }
   body.mode-landscape .board .card .corner{ font-size:10px; }
@@ -214,7 +206,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v19-grid-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v22-explicitgrid-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
