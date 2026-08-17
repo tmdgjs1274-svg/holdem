@@ -20,6 +20,8 @@
     --suit-red:#e5484d;
     --muted:rgba(245,247,251,0.6);
     --danger:#ef4444;
+    --lime:#a3e635;
+    --lime-dark:#365314;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -84,7 +86,9 @@
     border:1px solid rgba(59,130,246,0.5); background:transparent; color:var(--blue-soft);
   }
   .btn-toggle.active{ background:var(--blue); border-color:var(--blue); color:#04101f; }
-  .position-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.08); color:var(--card-white); letter-spacing:0.05em; }
+  .position-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--lime); color:var(--lime-dark); letter-spacing:0.05em; }
+  .btn-dot{ display:inline-block; width:11px; height:11px; border-radius:50%; background:var(--lime); box-shadow:0 0 0 2px rgba(163,230,53,0.3); vertical-align:middle; }
+  .code-inline{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:14px; letter-spacing:0.1em; color:var(--blue-soft); margin-left:4px; }
   .more-menu-wrap{ position:relative; }
   .more-btn{ background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px; line-height:1; }
   .more-dropdown{
@@ -173,7 +177,7 @@
 <body>
 
 <div id="app" class="host-app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v15-layout-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v16-lime-reorder-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -397,7 +401,7 @@
     }
   }
 
-  function topBarHTML(centerTitle){
+  function topBarHTML(centerTitle, extraRightHTML){
     return `
       <div class="top-bar">
         <span class="exit-link" id="exitLink">← 나가기</span>
@@ -405,6 +409,7 @@
         <span class="right-group">
           <button class="icon-btn" id="fsBtn" title="전체화면">⛶</button>
           <span class="seat-badge">호스트</span>
+          ${extraRightHTML || ''}
         </span>
       </div>
     `;
@@ -587,7 +592,7 @@
           <div class="card-top-row">
             ${dragOk ? `<span class="drag-handle">⠿</span>` : ''}
             ${posTag}
-            <span class="name" style="${isLeft ? 'color:var(--muted); font-weight:400;' : ''}">${names[seat]}${isLeft ? ' (나감)' : ''}${isButton ? ' 🔘' : ''}</span>
+            <span class="name" style="${isLeft ? 'color:var(--muted); font-weight:400;' : ''}">${names[seat]}${isLeft ? ' (나감)' : ''}${isButton ? ' <span class="btn-dot"></span>' : ''}</span>
             <div class="more-menu-wrap">
               <button class="more-btn" data-more="${seat}">⋯</button>
             </div>
@@ -598,16 +603,19 @@
     }
 
     const actionLabel = onlyOneLeft ? '게임 종료' : NEXT_ACTION_LABEL[phase];
+    const codeHTML = `<span class="code-inline">${roomId}</span><button class="copy-btn" id="copyRoomBtn" style="margin-top:0; padding:4px 10px; font-size:10px;">코드 복사</button>`;
 
     app.innerHTML = `
-      ${topBarHTML('진행자 화면')}
-      <div class="felt-panel top-row">
-        <div class="code-block">
-          <span class="field-label" style="margin:0;">접속 코드</span>
-          <span class="code">${roomId}</span>
-          <button class="copy-btn" id="copyRoomBtn" style="margin-top:0;">코드 복사</button>
+      ${topBarHTML('진행자 화면', codeHTML)}
+      <div class="felt-panel">
+        <div class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>참가자${showResults ? ' 결과' : ''} &nbsp;<span style="color:var(--muted); font-weight:400;">인원 ${joinedCount()}명 / 최대 ${MAX_SEATS}명</span></span>
+          ${showResults ? `<button class="btn-toggle ${hostRevealAll?'active':''}" id="revealAllBtn" style="font-size:11px;">👁 ${hostRevealAll ? '모든 카드 숨기기' : '모든 카드 보기 (호스트 전용)'}</button>` : ''}
         </div>
-        <div class="count-block">인원 ${joinedCount()}명 / 최대 ${MAX_SEATS}명</div>
+        <div class="participant-results-grid" id="participantGrid">
+          ${order.map(participantCard).join('')}
+        </div>
+        ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
       </div>
       <div class="hairline"></div>
       <div class="felt-panel game-row">
@@ -620,17 +628,6 @@
           ${onlyOneLeft ? `<div class="waiting-note" style="padding:0 0 10px;">폴드하지 않은 참가자가 1명 남았어요.</div>` : ''}
           <button class="chip-btn" id="actionBtn" ${!enoughPlayers && phase==='waiting' ? 'disabled' : ''}>${actionLabel}</button>
         </div>
-      </div>
-      <div class="hairline"></div>
-      <div class="felt-panel">
-        <div class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>참가자${showResults ? ' 결과' : ''}</span>
-          ${showResults ? `<button class="btn-toggle ${hostRevealAll?'active':''}" id="revealAllBtn" style="font-size:11px;">👁 ${hostRevealAll ? '모든 카드 숨기기' : '모든 카드 보기 (호스트 전용)'}</button>` : ''}
-        </div>
-        <div class="participant-results-grid" id="participantGrid">
-          ${order.map(participantCard).join('')}
-        </div>
-        ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
       </div>
     `;
     bindTopBar();
