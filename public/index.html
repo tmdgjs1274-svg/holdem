@@ -59,7 +59,7 @@
   .game-row .board-section{ flex:1; min-width:260px; margin-bottom:0; }
   .game-row .action-side{ flex-shrink:0; min-width:200px; }
   .game-row .action-side .chip-btn{ margin-top:0; }
-  .participant-results-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; }
+  .participant-results-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
   .participant-card{
     background:rgba(0,0,0,0.2); border:1px solid rgba(59,130,246,0.2); border-radius:12px; padding:10px;
   }
@@ -167,7 +167,7 @@
   .hand-block .who{ font-size:12px; color:var(--muted); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
   .cards{ display:flex; gap:8px; }
   .waiting-note{ text-align:center; color:var(--muted); font-size:13px; padding:18px 6px; line-height:1.6; }
-  .win-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; letter-spacing:0.05em; }
+  .win-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; letter-spacing:0.05em; white-space:nowrap; display:inline-block; }
   .win-tag.category{ background:rgba(255,255,255,0.1); color:var(--muted); }
   .win-tag.win{ background:linear-gradient(180deg,#ffe08a,#f5a623); color:#3a2400; box-shadow:0 0 0 1px rgba(245,166,35,0.5); }
   .win-tag.fold{ background:rgba(239,68,68,0.15); color:#ffb4b4; }
@@ -182,7 +182,7 @@
 <body>
 
 <div id="app" class="host-app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v20-reorder-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v21-badgefix-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
