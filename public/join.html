@@ -141,12 +141,29 @@
   .my-hand-hero .who{ font-size:13px; color:var(--muted); margin-bottom:16px; letter-spacing:0.1em; }
   .my-hand-hero .cards{ display:flex; gap:16px; justify-content:center; }
   .err-msg{ color:var(--danger); font-size:12px; text-align:center; margin-top:8px; }
+  .felt-panel.game-panel{ display:flex; flex-direction:column; flex:1; }
+  @media (orientation:landscape) and (max-height:520px){
+    body:not(.mode-portrait) .felt-panel.game-panel{ flex-direction:row; align-items:flex-start; gap:16px; }
+    body:not(.mode-portrait) .felt-panel.game-panel .board-section{ flex:1; margin-bottom:0; }
+    body:not(.mode-portrait) .felt-panel.game-panel .my-hand-hero{ flex:1; min-height:auto; padding:0; }
+    body:not(.mode-portrait) .felt-panel.game-panel .board{ flex-wrap:wrap; justify-content:flex-start; margin-bottom:8px; }
+    body:not(.mode-portrait) #app{ max-width:680px; }
+  }
+  body.mode-landscape .felt-panel.game-panel{ flex-direction:row; align-items:flex-start; gap:16px; }
+  body.mode-landscape .felt-panel.game-panel .board-section{ flex:1; margin-bottom:0; }
+  body.mode-landscape .felt-panel.game-panel .my-hand-hero{ flex:1; min-height:auto; padding:0; }
+  body.mode-landscape .felt-panel.game-panel .board{ flex-wrap:wrap; justify-content:flex-start; margin-bottom:8px; }
+  body.mode-landscape #app{ max-width:680px; }
+  .layout-toggle-btn{
+    font-size:10px; padding:4px 10px; border-radius:999px; border:1px solid rgba(59,130,246,0.5);
+    background:rgba(0,0,0,0.3); color:var(--blue-soft); cursor:pointer; flex-shrink:0;
+  }
 </style>
 </head>
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v13-nextgame-reset-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v15-landscape-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -267,7 +284,7 @@
   const socket = io();
 
   const POSITION_LABELS_BY_COUNT = {
-    2: ['BTN','BB'],
+    2: ['BTN/SB','BB'],
     3: ['BTN','SB','BB'],
     4: ['BTN','SB','BB','UTG'],
     5: ['BTN','SB','BB','UTG','CO'],
@@ -294,6 +311,21 @@
   let myStatus = 'open';     // 'open'|'closed'|'folded' - 서버로 전송됨
   let myFoldReveal = false;  // 폴드했어도 카드를 보여줄지 (승패엔 영향 없음)
   let joinError = '';
+  let layoutMode = 'auto'; // 'auto'|'landscape'|'portrait'
+
+  function applyLayoutMode(){
+    document.body.classList.remove('mode-landscape','mode-portrait');
+    if(layoutMode==='landscape') document.body.classList.add('mode-landscape');
+    if(layoutMode==='portrait') document.body.classList.add('mode-portrait');
+  }
+  function cycleLayoutMode(){
+    layoutMode = layoutMode==='auto' ? 'landscape' : (layoutMode==='landscape' ? 'portrait' : 'auto');
+    applyLayoutMode();
+    render();
+  }
+  function layoutModeLabel(){
+    return layoutMode==='auto' ? '자동' : (layoutMode==='landscape' ? '가로' : '세로');
+  }
 
   const app = document.getElementById('app');
 
@@ -420,8 +452,9 @@
       <div class="top-bar">
         <span class="exit-link" id="exitLink">← 나가기</span>
         <span class="seat-badge">${myName}${myPosition ? ` · ${myPosition}` : ''}</span>
+        <button class="layout-toggle-btn" id="layoutBtn">⤢ ${layoutModeLabel()}</button>
       </div>
-      <div class="felt-panel" style="display:flex; flex-direction:column; flex:1;">
+      <div class="felt-panel game-panel">
         ${isFolded ? `<div class="fold-banner">🚫 폴드함</div>` : ''}
         <div class="board-section">
           <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
@@ -458,6 +491,7 @@
       </div>
     `;
     document.getElementById('exitLink').onclick = ()=>{ location.reload(); };
+    document.getElementById('layoutBtn').onclick = cycleLayoutMode;
     if(showViewToggle){
       document.getElementById('toggleBtn').onclick = ()=>{ localReveal = !localReveal; render(); };
     }

@@ -45,6 +45,24 @@
   .host-grid{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
   .host-grid .col-participants{ flex:0 0 380px; min-width:320px; }
   .host-grid .col-game{ flex:1 1 380px; min-width:300px; }
+  #app.host-app{ max-width:1100px; }
+  .top-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .top-row .code-block{ display:flex; align-items:center; gap:10px; }
+  .top-row .code-block .code{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:26px; letter-spacing:0.12em; color:var(--blue-soft); }
+  .top-row .count-block{ font-size:12px; color:var(--muted); }
+  .game-row{ display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+  .game-row .board-section{ flex:1; min-width:260px; margin-bottom:0; }
+  .game-row .action-side{ flex-shrink:0; min-width:200px; }
+  .game-row .action-side .chip-btn{ margin-top:0; }
+  .participant-results-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:10px; }
+  .participant-card{
+    background:rgba(0,0,0,0.2); border:1px solid rgba(59,130,246,0.2); border-radius:12px; padding:10px;
+  }
+  .participant-card.connected{ border-color:rgba(59,130,246,0.4); }
+  .participant-card.folded-block{ border-color:rgba(255,255,255,0.18); opacity:0.65; background:rgba(255,255,255,0.02); }
+  .participant-card .card-top-row{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .participant-card .name{ font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+  .participant-card .who-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
   .result-row{ display:flex; gap:16px; flex-wrap:wrap; }
   .result-row .hand-block{ flex:1; min-width:200px; }
   .participant-grid{ display:flex; flex-direction:column; gap:8px; }
@@ -154,8 +172,8 @@
 </head>
 <body>
 
-<div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v14-position-revealall-host</div>
+<div id="app" class="host-app"></div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v15-layout-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -273,7 +291,7 @@
 
   // 버튼(BTN) 기준으로 좌석 순서에 따라 포지션 이름을 배정한다
   const POSITION_LABELS_BY_COUNT = {
-    2: ['BTN','BB'],
+    2: ['BTN/SB','BB'],
     3: ['BTN','SB','BB'],
     4: ['BTN','SB','BB','UTG'],
     5: ['BTN','SB','BB','UTG','CO'],
@@ -466,6 +484,15 @@
     broadcastGameState();
     render();
   }
+  // 다음 게임으로 넘어갈 때 버튼을 현재 좌석 순서상 다음 사람에게 자동으로 넘긴다
+  function advanceButtonSeat(prevButtonSeat){
+    const active = connectedSeats();
+    const order = (gameState.seatOrder||[]).filter(s=> active.includes(s));
+    if(!prevButtonSeat || order.length===0) return prevButtonSeat || null;
+    const idx = order.indexOf(prevButtonSeat);
+    if(idx===-1) return order[0];
+    return order[(idx+1) % order.length];
+  }
   function moveSeat(seat, direction){
     const order = orderedRosterSeats();
     const idx = order.indexOf(seat);
@@ -497,48 +524,6 @@
     return { winners, evals, openSeats };
   }
 
-  // 참가자 상태/결과 패널 - 분배 이후부터 항상 노출. 카드 자체는 phase가 'result'일 때만 실제로 보여준다.
-  function hostStatusPanelHTML(state, showCards, revealAll){
-    const seats = Object.keys(state.hands).map(Number).sort((a,b)=>a-b);
-    const status = state.status || {};
-    const reveal = state.reveal || {};
-    const positions = computePositions(orderedRosterSeats(), state.buttonSeat);
-    const { winners, evals } = showCards ? computeWinners(state, status) : { winners:[], evals:{} };
-
-    function seatBlock(seat){
-      const st = status[seat] || 'open';
-      const isWinner = winners.includes(seat);
-      const isFolded = st==='folded';
-      const foldRevealed = isFolded && !!reveal[seat];
-      // 호스트가 "모든 카드 보기"를 켰으면 상태와 무관하게 카드를 보여준다 (승패 계산에는 영향 없음, 호스트만 보임)
-      const showActualCards = revealAll || (showCards && (st==='open' || foldRevealed));
-      const cardsHTML = showActualCards
-        ? `<div class="cards">${state.hands[seat].map(c=>cardHTML(c)).join('')}</div>`
-        : `<div class="cards"><div class="card card-empty"></div><div class="card card-empty"></div></div>`;
-      const posTag = positions[seat] ? `<span class="position-tag">${positions[seat]}</span> ` : '';
-      let tagHTML;
-      if(isFolded){
-        tagHTML = foldRevealed
-          ? `<span class="win-tag fold">폴드 (공개)</span>${showCards ? ` <span class="win-tag category">${categoryLabel(bestHandAny([...state.hands[seat], ...state.board]))}</span>` : ''}`
-          : `<span class="win-tag fold">폴드</span>`;
-      } else if(st==='closed'){
-        tagHTML = `<span class="win-tag fold">비공개</span>`;
-      } else if(showCards){
-        tagHTML = `<span class="win-tag category">${categoryLabel(evals[seat])}</span>${isWinner ? ` <span class="win-tag win">WIN</span>` : ''}`;
-      } else {
-        tagHTML = `<span class="win-tag category">공개 예정</span>`;
-      }
-      return `
-        <div class="hand-block ${isFolded ? 'folded-block' : ''}">
-          <div class="who">${posTag}${nameOf(seat)} &nbsp; ${tagHTML}</div>
-          ${cardsHTML}
-        </div>
-      `;
-    }
-
-    return `<div class="result-row">${seats.map(seatBlock).join('')}</div>`;
-  }
-
   function renderHost(){
     if(!roomId){ renderLanding(); return; }
     const state = gameState || {phase:'waiting'};
@@ -547,6 +532,7 @@
     const activeSeats = connectedSeats();
     const enoughPlayers = activeSeats.length>=2;
     const status = state.status || {};
+    const reveal = state.reveal || {};
     const order = orderedRosterSeats();
     const positions = computePositions(order, state.buttonSeat);
     const dragOk = typeof Sortable !== 'undefined';
@@ -555,36 +541,58 @@
     const dealtSeats = state.hands ? Object.keys(state.hands).map(Number) : [];
     const notFolded = dealtSeats.filter(seat => (status[seat]||'open') !== 'folded');
     const onlyOneLeft = dealtSeats.length>0 && notFolded.length===1 && phase!=='waiting' && phase!=='result';
+    const showResults = dealtSeats.length>0 && phase!=='waiting';
+    const showCards = phase==='result';
 
-    let statusPanelHTML = '';
-    if(dealtSeats.length>0 && phase!=='waiting'){
-      statusPanelHTML = hostStatusPanelHTML(state, phase==='result', hostRevealAll);
+    let winners = [], evals = {};
+    if(showResults){
+      const w = computeWinners(state, status);
+      winners = w.winners; evals = w.evals;
     }
-    const showRevealAllToggle = dealtSeats.length>0 && phase!=='waiting';
 
-    function participantRow(seat, idx){
+    function participantCard(seat){
       if(!names[seat]) return '';
       const isLeft = !!left[seat];
       const isButton = state.buttonSeat === seat;
       const posTag = positions[seat] ? `<span class="position-tag">${positions[seat]}</span>` : '';
+      const hasHand = dealtSeats.includes(seat);
+
+      let bodyHTML = '';
+      if(showResults && hasHand){
+        const st = status[seat] || 'open';
+        const isWinner = winners.includes(seat);
+        const isFolded = st==='folded';
+        const foldRevealed = isFolded && !!reveal[seat];
+        const showActualCards = hostRevealAll || (showCards && (st==='open' || foldRevealed));
+        const cardsHTML = showActualCards
+          ? `<div class="cards">${state.hands[seat].map(c=>cardHTML(c)).join('')}</div>`
+          : `<div class="cards"><div class="card card-empty"></div><div class="card card-empty"></div></div>`;
+        let tagHTML;
+        if(isFolded){
+          tagHTML = foldRevealed
+            ? `<span class="win-tag fold">폴드 (공개)</span>${showCards ? ` <span class="win-tag category">${categoryLabel(bestHandAny([...state.hands[seat], ...state.board]))}</span>` : ''}`
+            : `<span class="win-tag fold">폴드</span>`;
+        } else if(st==='closed'){
+          tagHTML = `<span class="win-tag fold">비공개</span>`;
+        } else if(showCards){
+          tagHTML = `<span class="win-tag category">${categoryLabel(evals[seat])}</span>${isWinner ? ` <span class="win-tag win">WIN</span>` : ''}`;
+        } else {
+          tagHTML = `<span class="win-tag category">공개 예정</span>`;
+        }
+        bodyHTML = `<div class="who-row">${tagHTML}</div>${cardsHTML}`;
+      }
+
       return `
-        <div class="name-slot ${isLeft ? '' : 'connected'}" data-seat="${seat}">
-          ${dragOk ? `<span class="drag-handle">⠿</span>` : `
-            <span style="display:flex; flex-direction:column; gap:2px;">
-              <button class="icon-btn" style="width:20px; height:16px; font-size:10px;" data-move="-1" data-seat="${seat}" ${idx===0?'disabled':''}>▲</button>
-              <button class="icon-btn" style="width:20px; height:16px; font-size:10px;" data-move="1" data-seat="${seat}" ${idx===order.length-1?'disabled':''}>▼</button>
-            </span>
-          `}
-          <div class="name-wrap">
+        <div class="participant-card ${isLeft ? '' : 'connected'} ${hasHand && (status[seat]==='folded') ? 'folded-block' : ''}" data-seat="${seat}">
+          <div class="card-top-row">
+            ${dragOk ? `<span class="drag-handle">⠿</span>` : ''}
             ${posTag}
-            <span class="name" style="${isLeft ? 'color:var(--muted); font-weight:400;' : ''}">${names[seat]}${isLeft ? ' (나감)' : ''}</span>
-          </div>
-          <div class="right-controls">
-            <button class="btn-toggle ${isButton?'active':''}" data-btnseat="${seat}">BTN</button>
+            <span class="name" style="${isLeft ? 'color:var(--muted); font-weight:400;' : ''}">${names[seat]}${isLeft ? ' (나감)' : ''}${isButton ? ' 🔘' : ''}</span>
             <div class="more-menu-wrap">
               <button class="more-btn" data-more="${seat}">⋯</button>
             </div>
           </div>
+          ${bodyHTML}
         </div>
       `;
     }
@@ -593,48 +601,41 @@
 
     app.innerHTML = `
       ${topBarHTML('진행자 화면')}
-      <div class="host-grid">
-        <div class="col-participants">
-          <div class="felt-panel">
-            <div class="field-label">참가자 접속 코드</div>
-            <div class="room-code-row">
-              <div class="code">${roomId}</div>
-              <button class="copy-btn" id="copyRoomBtn">코드 복사</button>
-            </div>
-            <div class="hairline"></div>
-            <div class="field-label">인원 (${joinedCount()}명 / 최대 ${MAX_SEATS}명)</div>
-            <div class="participant-grid" id="participantGrid">
-              ${order.map(participantRow).join('')}
-            </div>
-            ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
-          </div>
+      <div class="felt-panel top-row">
+        <div class="code-block">
+          <span class="field-label" style="margin:0;">접속 코드</span>
+          <span class="code">${roomId}</span>
+          <button class="copy-btn" id="copyRoomBtn" style="margin-top:0;">코드 복사</button>
         </div>
-        <div class="col-game">
-          <div class="felt-panel">
-            <div class="phase-label" style="margin-top:0;">${PHASE_LABEL[phase]}<span class="tag">HOST</span></div>
-            <div class="board-section">
-              <div class="section-label">커뮤니티 카드</div>
-              <div class="board">${boardHTML(state.board, revealCount)}</div>
-            </div>
-            ${phase==='waiting' ? `<div class="waiting-note">${enoughPlayers ? '분배 시작을 누르면 참가자들에게<br>홀카드 2장씩 지급됩니다.' : '최소 2명 이상 입장해야 시작할 수 있어요.'}</div>` : ''}
-            ${onlyOneLeft ? `<div class="waiting-note">폴드하지 않은 참가자가 1명 남았어요.<br>"게임 종료"를 누르면 카드 공개 여부를 확인할 수 있어요.</div>` : ''}
-            ${!onlyOneLeft && phase==='river' ? `<div class="waiting-note">각 참가자가 카드 공개 여부를 결정하면<br>"게임 종료"를 눌러 결과를 확인하세요.</div>` : ''}
-            <button class="chip-btn" id="actionBtn" ${!enoughPlayers && phase==='waiting' ? 'disabled' : ''}>${actionLabel}</button>
-          </div>
+        <div class="count-block">인원 ${joinedCount()}명 / 최대 ${MAX_SEATS}명</div>
+      </div>
+      <div class="hairline"></div>
+      <div class="felt-panel game-row">
+        <div class="board-section">
+          <div class="section-label">커뮤니티 카드<span class="phase-tag" style="color:var(--blue-soft); font-family:'Noto Serif KR',serif; font-weight:700; text-transform:none;">${PHASE_LABEL[phase]}</span></div>
+          <div class="board">${boardHTML(state.board, revealCount)}</div>
+        </div>
+        <div class="action-side">
+          ${phase==='waiting' && !enoughPlayers ? `<div class="waiting-note" style="padding:0 0 10px;">최소 2명 이상 입장해야 시작할 수 있어요.</div>` : ''}
+          ${onlyOneLeft ? `<div class="waiting-note" style="padding:0 0 10px;">폴드하지 않은 참가자가 1명 남았어요.</div>` : ''}
+          <button class="chip-btn" id="actionBtn" ${!enoughPlayers && phase==='waiting' ? 'disabled' : ''}>${actionLabel}</button>
         </div>
       </div>
-      ${statusPanelHTML ? `<div class="hairline"></div><div class="felt-panel">
-        ${showRevealAllToggle ? `
-          <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-            <button class="btn-toggle ${hostRevealAll?'active':''}" id="revealAllBtn" style="padding:6px 12px; font-size:11px;">👁 ${hostRevealAll ? '모든 카드 숨기기' : '모든 카드 보기 (호스트 전용)'}</button>
-          </div>
-        ` : ''}
-        ${statusPanelHTML}
-      </div>` : ''}
+      <div class="hairline"></div>
+      <div class="felt-panel">
+        <div class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>참가자${showResults ? ' 결과' : ''}</span>
+          ${showResults ? `<button class="btn-toggle ${hostRevealAll?'active':''}" id="revealAllBtn" style="font-size:11px;">👁 ${hostRevealAll ? '모든 카드 숨기기' : '모든 카드 보기 (호스트 전용)'}</button>` : ''}
+        </div>
+        <div class="participant-results-grid" id="participantGrid">
+          ${order.map(participantCard).join('')}
+        </div>
+        ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
+      </div>
     `;
     bindTopBar();
 
-    // 더보기(⋯) 메뉴 - 내보내기
+    // 더보기(⋯) 메뉴 - 버튼 지정/해제, 내보내기
     app.querySelectorAll('[data-more]').forEach(el=>{
       el.onclick = (e)=>{
         e.stopPropagation();
@@ -642,21 +643,21 @@
         const existing = el.parentElement.querySelector('.more-dropdown');
         document.querySelectorAll('.more-dropdown').forEach(d=>d.remove());
         if(existing) return; // 토글: 이미 열려있었으면 닫기만 하고 종료
+        const isButton = state.buttonSeat === seat;
         const dropdown = document.createElement('div');
         dropdown.className = 'more-dropdown';
-        dropdown.innerHTML = `<button data-kick="${seat}">내보내기</button>`;
+        dropdown.innerHTML = `
+          <button data-setbtn="${seat}">${isButton ? '버튼 해제' : '버튼으로 지정'}</button>
+          <button data-kick="${seat}">내보내기</button>
+        `;
         el.parentElement.appendChild(dropdown);
+        dropdown.querySelector('[data-setbtn]').onclick = (e2)=>{ e2.stopPropagation(); setButtonSeat(seat); };
         dropdown.querySelector('[data-kick]').onclick = (e2)=>{ e2.stopPropagation(); kickPlayer(seat); };
       };
     });
     document.querySelectorAll('.more-dropdown').forEach(d=>d.remove()); // 매 렌더링시 정리
 
-    // BTN(버튼) 지정
-    app.querySelectorAll('[data-btnseat]').forEach(el=>{
-      el.onclick = ()=> setButtonSeat(parseInt(el.dataset.btnseat,10));
-    });
-
-    // 순서 변경: Sortable 사용 가능하면 드래그, 아니면 위/아래 버튼
+    // 순서 변경: Sortable 사용 가능하면 드래그
     const gridEl = document.getElementById('participantGrid');
     if(dragOk && gridEl){
       Sortable.create(gridEl, {
@@ -667,10 +668,6 @@
           const newOrder = Array.from(gridEl.children).map(el=>parseInt(el.dataset.seat,10));
           reorderSeats(newOrder);
         }
-      });
-    } else {
-      app.querySelectorAll('[data-move]').forEach(el=>{
-        el.onclick = ()=> moveSeat(parseInt(el.dataset.seat,10), parseInt(el.dataset.move,10));
       });
     }
 
@@ -695,8 +692,9 @@
           next = dealNewHand(activeSeats);
           next.seatOrder = state.seatOrder; next.buttonSeat = state.buttonSeat;
         } else if(phase==='result'){
-          next = {phase:'waiting', seatOrder: state.seatOrder, buttonSeat: state.buttonSeat};
           clearLeftSeats(); // 대기 상태로 돌아갈 때 나간 참가자 자리 정리
+          const newButton = state.buttonSeat ? advanceButtonSeat(state.buttonSeat) : state.buttonSeat;
+          next = {phase:'waiting', seatOrder: state.seatOrder, buttonSeat: newButton};
         } else if(phase==='river'){
           next = {...state, phase:'result'};
         } else {
