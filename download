@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>홀덤 분배기 - 참가</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg-dark:#05070d;
+    --bg-mid:#0a1020;
+    --bg-light:#101c38;
+    --blue:#3b82f6;
+    --blue-soft:#8ec1ff;
+    --card-white:#f5f7fb;
+    --ink:#12141c;
+    --suit-red:#e5484d;
+    --muted:rgba(245,247,251,0.6);
+    --danger:#ef4444;
+    --lime:#a3e635;
+    --lime-dark:#365314;
+    --lime-soft-bg:rgba(163,230,53,0.16);
+    --lime-soft-text:#c8e896;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Noto Sans KR', -apple-system, sans-serif;
+    background:radial-gradient(ellipse at 50% -10%, var(--bg-light) 0%, var(--bg-mid) 45%, var(--bg-dark) 100%);
+    color:var(--card-white);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:0;
+  }
+  body.pseudo-fullscreen{
+    position:fixed; inset:0; width:100vw; height:100vh; height:100dvh;
+    overflow-y:auto; z-index:9999;
+  }
+  #app{
+    width:100%;
+    max-width:440px;
+    min-height:100vh;
+    padding:22px 18px 40px;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+  }
+  .brand{ text-align:center; margin-bottom:22px; }
+  .brand .mark{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:26px; letter-spacing:0.02em; color:var(--blue-soft); }
+  .brand .sub{ font-size:11px; letter-spacing:0.25em; color:var(--muted); margin-top:4px; text-transform:uppercase; }
+  .felt-panel{
+    background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.25));
+    border:1px solid rgba(59,130,246,0.35);
+    border-radius:18px;
+    padding:20px 16px;
+    position:relative;
+  }
+  .felt-panel::before{
+    content:''; position:absolute; inset:6px;
+    border:1px dashed rgba(59,130,246,0.25); border-radius:12px; pointer-events:none;
+  }
+  .field-label{ font-size:12px; color:var(--muted); margin-bottom:8px; display:block; letter-spacing:0.05em; }
+  input[type=text]{
+    width:100%; padding:14px 14px; border-radius:10px;
+    border:1px solid rgba(59,130,246,0.5);
+    background:rgba(0,0,0,0.35); color:var(--card-white);
+    font-size:20px; font-family:'Noto Serif KR', serif;
+    letter-spacing:0.12em; text-align:center; outline:none;
+  }
+  input[type=text]:focus{ border-color:var(--blue); }
+  input[type=text].name-input{ font-size:16px; letter-spacing:0.02em; text-transform:none; }
+  .chip-btn{
+    display:block; width:100%; margin-top:12px; padding:15px 18px;
+    border-radius:999px; border:1px solid var(--blue);
+    background:linear-gradient(180deg, var(--blue-soft), var(--blue) 70%);
+    color:#04101f; font-weight:700; font-size:15px; letter-spacing:0.02em;
+    cursor:pointer; box-shadow:0 3px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(0,0,0,0.5);
+    transition:transform .08s ease; -webkit-tap-highlight-color:transparent;
+  }
+  .chip-btn:active{ transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,0.5); }
+  .chip-btn:disabled{ opacity:0.4; cursor:default; }
+  .hairline{ height:1px; background:rgba(59,130,246,0.25); margin:18px 0; }
+  .room-tag{ text-align:center; font-size:12px; color:var(--muted); margin-bottom:2px; }
+  .phase-label{ text-align:center; font-family:'Noto Serif KR', serif; font-size:19px; font-weight:700; margin:6px 0 12px; color:var(--card-white); }
+  .board-section{ margin-bottom:8px; }
+  .section-label{ font-size:11px; color:var(--muted); letter-spacing:0.15em; margin-bottom:8px; text-transform:uppercase; display:flex; align-items:center; gap:10px; }
+  .section-label .phase-tag{ color:var(--blue-soft); font-family:'Noto Serif KR', serif; font-size:13px; letter-spacing:0.02em; text-transform:none; font-weight:700; }
+  .hand-rank-note{ text-align:center; font-size:13px; color:var(--blue-soft); font-weight:700; margin:-6px 0 12px; }
+  .fold-banner{
+    text-align:center; font-family:'Noto Serif KR', serif; font-weight:700; font-size:22px;
+    letter-spacing:0.1em; color:#e5e7eb; background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.25); border-radius:12px; padding:14px; margin-bottom:16px;
+  }
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:5000;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-box{
+    width:100%; max-width:420px; max-height:80vh; overflow-y:auto;
+    background:linear-gradient(180deg, var(--bg-light), var(--bg-mid));
+    border:1px solid rgba(59,130,246,0.4); border-radius:16px; padding:18px;
+  }
+  .modal-header{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Noto Serif KR', serif; font-weight:700; font-size:17px; color:var(--blue-soft);
+    margin-bottom:14px;
+  }
+  .modal-close{
+    background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:2px 6px;
+  }
+  .modal-row{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:10px; border-radius:10px; background:rgba(0,0,0,0.2); margin-bottom:8px;
+  }
+  .modal-name{ font-weight:700; font-size:13px; flex-shrink:0; min-width:70px; }
+  .view-result-btn{
+    display:block; width:100%; margin-top:10px; padding:12px 18px;
+    border-radius:999px; border:1px solid var(--blue); background:transparent;
+    color:var(--blue-soft); font-weight:700; font-size:14px; cursor:pointer;
+  }
+  .board{ display:flex; gap:7px; justify-content:center; margin-bottom:8px; }
+  .card{ width:58px; height:82px; border-radius:8px; background:var(--card-white); position:relative; box-shadow:0 3px 6px rgba(0,0,0,0.5); flex-shrink:0; }
+  .card.big{ width:96px; height:136px; }
+  .card.red{ color:var(--suit-red); }
+  .card.black{ color:var(--ink); }
+  .card .corner{ position:absolute; font-size:13px; font-weight:700; line-height:1.05; text-align:center; font-family:'Noto Sans KR',sans-serif; }
+  .card.big .corner{ font-size:19px; }
+  .card .corner.top{ top:5px; left:6px; }
+  .card .corner.bottom{ bottom:5px; right:6px; transform:rotate(180deg); }
+  .card .pip{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:26px; }
+  .card.big .pip{ font-size:44px; }
+  .card-empty{ background:transparent; border:1.5px dashed rgba(245,247,251,0.25); box-shadow:none; }
+  .card-back{ background: repeating-linear-gradient(135deg, var(--bg-mid) 0 6px, var(--bg-dark) 6px 12px); border:2px solid var(--blue); }
+  .card-back::after{ content:'♠'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--blue-soft); opacity:0.85; }
+  .card-back.big::after{ font-size:34px; }
+  .hand-block{ margin-bottom:14px; }
+  .hand-block .who{ font-size:12px; color:var(--muted); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .hand-block .cards{ display:flex; gap:8px; }
+  .waiting-note{ text-align:center; color:var(--muted); font-size:13px; padding:18px 6px; line-height:1.6; }
+  .result-banner{
+    text-align:center; font-family:'Noto Serif KR', serif; font-weight:700; font-size:17px; color:var(--blue-soft);
+    background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.4); border-radius:12px; padding:12px; margin-bottom:16px;
+  }
+  .result-banner.warn{ color:#ffb4b4; background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.4); }
+  .result-banner .hand-name{ display:block; font-family:'Noto Sans KR',sans-serif; font-weight:400; font-size:12px; color:var(--muted); margin-top:4px; }
+  .win-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; letter-spacing:0.05em; }
+  .win-tag.win{ background:var(--blue-soft); color:#04101f; }
+  .win-tag.lose{ background:rgba(255,255,255,0.1); color:var(--muted); }
+  .top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; }
+  .top-bar .badge-group{ display:flex; align-items:center; gap:4px; }
+  .icon-btn{
+    width:30px; height:30px; border-radius:8px; border:1px solid rgba(59,130,246,0.4);
+    background:rgba(0,0,0,0.3); color:var(--blue-soft); cursor:pointer; font-size:14px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .exit-link{ font-size:11px; color:var(--muted); text-decoration:underline; cursor:pointer; }
+  .seat-badge{ display:inline-block; font-size:10px; letter-spacing:0.1em; color:#04101f; background:var(--blue-soft); border-radius:999px; padding:2px 9px; font-weight:700; }
+  .position-tag{ display:inline-block; font-size:10px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--lime-soft-bg); color:var(--lime-soft-text); letter-spacing:0.05em; }
+  .toggle-row{ display:flex; justify-content:center; gap:8px; margin:10px 0 4px; flex-wrap:wrap; }
+  .toggle-btn{ font-size:12px; padding:8px 16px; border-radius:999px; border:1px solid rgba(59,130,246,0.5); background:rgba(0,0,0,0.3); color:var(--blue-soft); cursor:pointer; }
+  .open-toggle-wrap{ text-align:center; margin:14px 0 4px; }
+  .open-toggle-wrap .label{ font-size:12px; color:var(--muted); margin-bottom:8px; }
+  .open-toggle-btn{
+    font-size:14px; font-weight:700; padding:12px 28px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--blue);
+  }
+  .open-toggle-btn.open{ background:linear-gradient(180deg, var(--blue-soft), var(--blue) 70%); color:#04101f; }
+  .open-toggle-btn.fold{ background:rgba(239,68,68,0.15); color:#ffb4b4; border-color:var(--danger); }
+
+  /* 참가자 화면: 내 홀카드를 화면 중앙에 크게 강조 */
+  .hand-section{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:14px 0 10px;
+  }
+  .hand-section .who{ font-size:13px; color:var(--muted); margin-bottom:16px; letter-spacing:0.1em; }
+  .hand-section .cards{ display:flex; gap:16px; justify-content:center; }
+  .open-area-section, .fold-area-section{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+  }
+  .err-msg{ color:var(--danger); font-size:12px; text-align:center; margin-top:8px; }
+
+  /* 세로모드(기본): 위→아래로 자연스럽게 쌓임 */
+  .game-grid{ display:flex; flex-direction:column; gap:10px; }
+  .game-grid .open-area-section:empty, .game-grid .fold-area-section:empty{ display:none; }
+
+  /* 가로모드: 좌측(커뮤니티카드/공개유무/폴드) · 우측(내 홀카드+카드보기) 2단 컬럼 */
+  @media (orientation:landscape) and (max-height:520px){
+    body:not(.mode-portrait) #app{ max-width:760px; }
+    body:not(.mode-portrait) .game-grid{
+      display:flex;
+      flex-direction:row;
+      align-items:center;
+      gap:20px;
+    }
+    body:not(.mode-portrait) .game-col-left{ flex:1.15; display:flex; flex-direction:column; gap:14px; min-width:0; }
+    body:not(.mode-portrait) .game-col-right{ flex:0.85; display:flex; flex-direction:column; align-items:center; min-width:0; }
+    body:not(.mode-portrait) .board-section{ margin-bottom:0; }
+    body:not(.mode-portrait) .board{ flex-wrap:nowrap; justify-content:center; gap:5px; }
+    body:not(.mode-portrait) .section-label{ justify-content:center; }
+    body:not(.mode-portrait) .board .card{ width:42px; height:60px; }
+    body:not(.mode-portrait) .board .card .corner{ font-size:10px; }
+    body:not(.mode-portrait) .board .card .pip{ font-size:17px; }
+  }
+  body.mode-landscape #app{ max-width:760px; }
+  body.mode-landscape .game-grid{
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    gap:20px;
+  }
+  body.mode-landscape .game-col-left{ flex:1.15; display:flex; flex-direction:column; gap:14px; min-width:0; }
+  body.mode-landscape .game-col-right{ flex:0.85; display:flex; flex-direction:column; align-items:center; min-width:0; }
+  body.mode-landscape .board-section{ margin-bottom:0; }
+  body.mode-landscape .board{ flex-wrap:nowrap; justify-content:center; gap:5px; }
+  body.mode-landscape .section-label{ justify-content:center; }
+  body.mode-landscape .board .card{ width:42px; height:60px; }
+  body.mode-landscape .board .card .corner{ font-size:10px; }
+  body.mode-landscape .board .card .pip{ font-size:17px; }
+  /* 세로모드에서는 좌/우 컬럼 래퍼가 레이아웃에 영향을 주지 않도록(자연스러운 DOM 순서 유지) */
+  .game-col-left, .game-col-right{ display:contents; }
+  .layout-toggle-btn{
+    font-size:10px; padding:4px 10px; border-radius:999px; border:1px solid rgba(59,130,246,0.5);
+    background:rgba(0,0,0,0.3); color:var(--blue-soft); cursor:pointer; flex-shrink:0;
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v26-features-join</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(function(){
+  const SUIT_SYMBOL = {S:'♠',H:'♥',D:'♦',C:'♣'};
+  const RANK_VALUE = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14};
+  const CATEGORY_NAMES = ['하이 카드','원 페어','투 페어','트리플','스트레이트','플러시','풀 하우스','포카드','스트레이트 플러시'];
+
+  function parseCard(str){ return {rank:RANK_VALUE[str[0]], suit:str[1]}; }
+  function evaluate5(cards){
+    const ranksSorted = cards.map(c=>c.rank).sort((a,b)=>b-a);
+    const suits = cards.map(c=>c.suit);
+    const isFlush = suits.every(s=>s===suits[0]);
+    const uniqueRanks = [...new Set(ranksSorted)];
+    let straightHigh = null;
+    if(uniqueRanks.length===5){
+      if(uniqueRanks[0]-uniqueRanks[4]===4){ straightHigh = uniqueRanks[0]; }
+      else if(uniqueRanks[0]===14 && uniqueRanks[1]===5 && uniqueRanks[2]===4 && uniqueRanks[3]===3 && uniqueRanks[4]===2){ straightHigh = 5; }
+    }
+    const countMap={};
+    ranksSorted.forEach(r=>countMap[r]=(countMap[r]||0)+1);
+    const groups = Object.entries(countMap).map(([r,c])=>({rank:+r,count:c}))
+      .sort((a,b)=> b.count-a.count || b.rank-a.rank);
+    let category, tiebreak;
+    if(isFlush && straightHigh){ category=8; tiebreak=[straightHigh]; }
+    else if(groups[0].count===4){ category=7; tiebreak=[groups[0].rank, groups[1].rank]; }
+    else if(groups[0].count===3 && groups[1] && groups[1].count===2){ category=6; tiebreak=[groups[0].rank, groups[1].rank]; }
+    else if(isFlush){ category=5; tiebreak=ranksSorted.slice(); }
+    else if(straightHigh){ category=4; tiebreak=[straightHigh]; }
+    else if(groups[0].count===3){
+      const kickers=groups.slice(1).map(g=>g.rank).sort((a,b)=>b-a);
+      category=3; tiebreak=[groups[0].rank, ...kickers];
+    }
+    else if(groups[0].count===2 && groups[1] && groups[1].count===2){
+      const pairRanks=[groups[0].rank, groups[1].rank].sort((a,b)=>b-a);
+      const kicker = groups[2].rank;
+      category=2; tiebreak=[pairRanks[0], pairRanks[1], kicker];
+    }
+    else if(groups[0].count===2){
+      const kickers=groups.slice(1).map(g=>g.rank).sort((a,b)=>b-a);
+      category=1; tiebreak=[groups[0].rank, ...kickers];
+    }
+    else{ category=0; tiebreak=ranksSorted.slice(); }
+    return {category, tiebreak};
+  }
+  function compareEval(a,b){
+    if(a.category!==b.category) return a.category-b.category;
+    for(let k=0;k<a.tiebreak.length;k++){
+      const diff=(a.tiebreak[k]||0)-(b.tiebreak[k]||0);
+      if(diff!==0) return diff;
+    }
+    return 0;
+  }
+  function best7(cardStrs7){
+    const cards = cardStrs7.map(parseCard);
+    let best=null;
+    for(let i=0;i<7;i++){
+      for(let j=i+1;j<7;j++){
+        const hand5 = cards.filter((_,idx)=>idx!==i&&idx!==j);
+        const ev = evaluate5(hand5);
+        if(!best || compareEval(ev,best)>0) best=ev;
+      }
+    }
+    return best;
+  }
+  // 카드가 5장 이상 몇 장이든(5,6,7장) 그 중 최고의 5장 조합을 찾는다 (참가자 실시간 족보 표시용)
+  function bestHandAny(cardStrs){
+    const cards = cardStrs.map(parseCard);
+    const n = cards.length;
+    if(n===5) return evaluate5(cards);
+    let best=null;
+    const idxs = [];
+    function combo(start, chosen){
+      if(chosen.length===5){
+        const ev = evaluate5(chosen.map(i=>cards[i]));
+        if(!best || compareEval(ev,best)>0) best=ev;
+        return;
+      }
+      for(let i=start;i<n;i++){ combo(i+1, [...chosen, i]); }
+    }
+    combo(0, []);
+    return best;
+  }
+  function categoryLabel(ev){
+    if(ev.category===8 && ev.tiebreak[0]===14) return '로열 플러시';
+    return CATEGORY_NAMES[ev.category];
+  }
+
+  // 공개(open)한 사람이 2명 이상일 때만 그들끼리 비교, 1명뿐이면 자동 승리 (호스트와 동일 규칙)
+  // 폴드 후 공개(참고용)는 승패 계산에 포함하지 않는다
+  function computeWinnersJoin(state){
+    const seats = state.hands ? Object.keys(state.hands).map(Number) : [];
+    const status = state.status || {};
+    const openSeats = seats.filter(seat=> status[seat]==='open');
+    const evals = {};
+    seats.forEach(seat=>{ evals[seat] = bestHandAny([...state.hands[seat], ...state.board]); });
+    if(openSeats.length===0) return { winners: [], evals };
+    if(openSeats.length===1) return { winners: [openSeats[0]], evals };
+    let bestEv = null;
+    openSeats.forEach(seat=>{ if(!bestEv || compareEval(evals[seat], bestEv)>0) bestEv = evals[seat]; });
+    const winners = openSeats.filter(seat=> compareEval(evals[seat], bestEv)===0);
+    return { winners, evals };
+  }
+
+  function resultModalHTML(state){
+    const seats = state.hands ? Object.keys(state.hands).map(Number).sort((a,b)=>a-b) : [];
+    const status = state.status || {};
+    const reveal = state.reveal || {};
+    const { winners, evals } = computeWinnersJoin(state);
+
+    const rows = seats.map(seat=>{
+      const st = status[seat] || 'open';
+      const isMe = seat===mySeat;
+      const displayName = (names[seat] || `${seat}번`) + (isMe ? ' (나)' : '');
+      const foldRevealed = st==='folded' && !!reveal[seat];
+      const isOpen = st==='open' || foldRevealed;
+      if(!isOpen){
+        const label = st==='folded' ? '폴드' : '비공개';
+        return `<div class="modal-row"><span class="modal-name">${displayName}</span><span class="win-tag fold">${label}</span></div>`;
+      }
+      const isWinner = winners.includes(seat);
+      const label = categoryLabel(evals[seat]);
+      const cardsHTML = state.hands[seat].map(c=>cardHTML(c)).join('');
+      return `
+        <div class="modal-row">
+          <span class="modal-name">${displayName}</span>
+          <span class="cards" style="gap:6px;">${cardsHTML}</span>
+          <span class="win-tag category">${label}</span>
+          ${isWinner ? `<span class="win-tag win">WIN</span>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="modal-overlay" id="resultModalOverlay">
+        <div class="modal-box">
+          <div class="modal-header">
+            <span>게임 결과</span>
+            <button class="modal-close" id="resultModalClose">✕</button>
+          </div>
+          <div class="modal-body">${rows}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function cardHTML(cardStr, opts){
+    opts = opts||{};
+    const big = opts.big ? ' big' : '';
+    if(!cardStr) return `<div class="card card-empty${big}"></div>`;
+    const rank = cardStr[0], suit = cardStr[1];
+    const rankLabel = rank==='T' ? '10' : rank;
+    const symbol = SUIT_SYMBOL[suit];
+    const colorClass = (suit==='H'||suit==='D') ? 'red' : 'black';
+    return `<div class="card ${colorClass}${big}">
+      <div class="corner top">${rankLabel}<br>${symbol}</div>
+      <div class="pip">${symbol}</div>
+      <div class="corner bottom">${rankLabel}<br>${symbol}</div>
+    </div>`;
+  }
+  function cardBackHTML(big){ return `<div class="card card-back${big?' big':''}"></div>`; }
+  function boardHTML(board, revealCount){
+    board = board || [];
+    let out='';
+    for(let i=0;i<5;i++){
+      out += i<revealCount ? cardHTML(board[i]) : `<div class="card card-empty"></div>`;
+    }
+    return out;
+  }
+
+  const PHASE_LABEL = {
+    waiting:'대기 중', dealt:'홀카드 분배 완료', flop:'플랍', turn:'턴', river:'리버', result:'결과'
+  };
+  const REVEAL_COUNT = { waiting:0, dealt:0, flop:3, turn:4, river:5, result:5 };
+
+  const socket = io();
+
+  const POSITION_LABELS_BY_COUNT = {
+    2: ['BTN/SB','BB'],
+    3: ['BTN','SB','BB'],
+    4: ['BTN','SB','BB','UTG'],
+    5: ['BTN','SB','BB','UTG','CO'],
+    6: ['BTN','SB','BB','UTG','HJ','CO'],
+    7: ['BTN','SB','BB','UTG','MP','HJ','CO'],
+    8: ['BTN','SB','BB','UTG','UTG+1','MP','HJ','CO'],
+    9: ['BTN','SB','BB','UTG','UTG+1','MP1','MP2','HJ','CO'],
+  };
+  function computePositions(orderedSeats, buttonSeat){
+    const positions = {};
+    if(!buttonSeat || !orderedSeats.includes(buttonSeat) || orderedSeats.length<2) return positions;
+    const n = orderedSeats.length;
+    const labels = POSITION_LABELS_BY_COUNT[n] || POSITION_LABELS_BY_COUNT[9];
+    const startIdx = orderedSeats.indexOf(buttonSeat);
+    const rotated = orderedSeats.slice(startIdx).concat(orderedSeats.slice(0, startIdx));
+    rotated.forEach((seat, i)=>{ if(labels[i]) positions[seat] = labels[i]; });
+    return positions;
+  }
+
+  let joined = false, mySeat = null, myName = '';
+  let names = {1:null, 2:null};
+  let lastState = {phase:'waiting'};
+  let localReveal = false;   // 내 카드 보기/가리기 (순전히 로컬, 프라이버시용)
+  let myStatus = 'open';     // 'open'|'closed'|'folded' - 서버로 전송됨
+  let myFoldReveal = false;  // 폴드했어도 카드를 보여줄지 (승패엔 영향 없음)
+  let joinError = '';
+  let showResultModal = false;
+  let layoutMode = 'auto'; // 'auto'|'landscape'|'portrait'
+
+  function applyLayoutMode(){
+    document.body.classList.remove('mode-landscape','mode-portrait');
+    if(layoutMode==='landscape') document.body.classList.add('mode-landscape');
+    if(layoutMode==='portrait') document.body.classList.add('mode-portrait');
+  }
+  let pseudoFullscreen = false; // iOS Safari 폴백 (CSS로 화면을 꽉 채움)
+  function supportsRealFullscreen(){
+    const el = document.documentElement;
+    return !!(el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen);
+  }
+  function toggleFullscreen(){
+    if(!supportsRealFullscreen()){
+      // iOS Safari 등: 표준 Fullscreen API 미지원 -> CSS로 화면을 최대한 채우는 방식으로 대체
+      pseudoFullscreen = !pseudoFullscreen;
+      document.body.classList.toggle('pseudo-fullscreen', pseudoFullscreen);
+      render();
+      return;
+    }
+    if(!document.fullscreenElement){
+      document.documentElement.requestFullscreen().catch(()=>{});
+    } else {
+      document.exitFullscreen().catch(()=>{});
+    }
+  }
+  function cycleLayoutMode(){
+    layoutMode = layoutMode==='auto' ? 'landscape' : (layoutMode==='landscape' ? 'portrait' : 'auto');
+    applyLayoutMode();
+    render();
+  }
+  function layoutModeLabel(){
+    return layoutMode==='auto' ? '자동' : (layoutMode==='landscape' ? '가로' : '세로');
+  }
+
+  const app = document.getElementById('app');
+
+  function renderJoinForm(){
+    app.innerHTML = `
+      <div class="brand">
+        <div class="mark" style="font-size:22px;">참가자 화면</div>
+        <div class="sub" style="text-transform:none; letter-spacing:0.02em; font-size:12px; margin-top:8px;">
+          이 화면은 본인만 보세요. 다른 사람에게 보여주지 마세요.
+        </div>
+      </div>
+      <div class="felt-panel">
+        <span class="field-label">이름</span>
+        <input type="text" id="nameInput" class="name-input" maxlength="20" placeholder="예: 승헌">
+        <div class="hairline"></div>
+        <span class="field-label">방 코드</span>
+        <input type="text" id="codeInput" maxlength="4" placeholder="예: A1B2">
+        <button class="chip-btn" id="joinBtn">입장하기</button>
+        <div class="err-msg" id="joinErr">${joinError||''}</div>
+      </div>
+    `;
+    document.getElementById('joinBtn').onclick = ()=>{
+      const name = document.getElementById('nameInput').value.trim();
+      const code = document.getElementById('codeInput').value.trim().toUpperCase();
+      const errEl = document.getElementById('joinErr');
+      if(!name){ errEl.textContent = '이름을 입력해주세요.'; return; }
+      if(!code){ errEl.textContent = '방 코드를 입력해주세요.'; return; }
+      const btn = document.getElementById('joinBtn');
+      btn.disabled = true; btn.textContent = '입장 중...';
+      socket.emit('join-room', { roomId: code, name }, (res)=>{
+        if(res && res.ok){
+          joined = true; mySeat = res.seat; myName = name;
+          lastState = res.state || {phase:'waiting'};
+          names = res.names || {1:null,2:null};
+          myStatus = (lastState.status && lastState.status[mySeat]) || 'open';
+          render();
+        } else {
+          joinError = (res && res.error) ? res.error : '입장 실패';
+          btn.disabled = false; btn.textContent = '입장하기';
+          renderJoinForm();
+        }
+      });
+    };
+  }
+
+  socket.on('state-update', (payload)=>{
+    lastState = payload.state;
+    names = payload.names || names;
+    // 새 판을 분배할 때는 서버가 모든 좌석의 status를 'open'으로 이미 초기화해서 보내주므로 그걸 그대로 따른다.
+    if(lastState.status && lastState.status[mySeat]) myStatus = lastState.status[mySeat];
+    if(lastState.reveal && typeof lastState.reveal[mySeat] !== 'undefined') myFoldReveal = !!lastState.reveal[mySeat];
+    // "다음 게임"을 눌러 대기 상태로 돌아가면 status/reveal 필드 자체가 없으므로, 여기서 명시적으로 리셋해준다
+    if(lastState.phase==='waiting'){ myStatus = 'open'; myFoldReveal = false; showResultModal = false; }
+    if(joined) render();
+  });
+  socket.on('host-left', ()=>{
+    joined = false; mySeat = null;
+    joinError = '호스트가 방을 나갔어요. 다시 입장해주세요.';
+    renderJoinForm();
+  });
+  socket.on('kicked', ()=>{
+    joined = false; mySeat = null;
+    joinError = '진행자가 참가자를 내보냈어요. 다시 입장해주세요.';
+    renderJoinForm();
+  });
+
+  function setStatus(status){
+    if(myStatus==='folded') return; // 폴드하면 더 이상 상태를 바꿀 수 없음
+    myStatus = status;
+    socket.emit('player-set-status', { status });
+    render();
+  }
+  function toggleOpenChoice(){
+    setStatus(myStatus==='open' ? 'closed' : 'open');
+  }
+  function doFold(){
+    if(myStatus==='folded') return;
+    setStatus('folded');
+  }
+  function toggleFoldReveal(){
+    myFoldReveal = !myFoldReveal;
+    socket.emit('player-set-reveal', { reveal: myFoldReveal });
+    render();
+  }
+
+  function render(){
+    if(!joined){ renderJoinForm(); return; }
+
+    const state = lastState || {phase:'waiting'};
+    const phase = state.phase || 'waiting';
+    const revealCount = REVEAL_COUNT[phase] ?? 0;
+    const myCards = state.hands ? state.hands[mySeat] : null;
+
+    let myCardsHTML;
+    if(phase==='waiting' || !myCards){
+      myCardsHTML = `<div class="cards">${cardBackHTML(true)}${cardBackHTML(true)}</div>`;
+    } else {
+      myCardsHTML = `<div class="cards">${
+        localReveal ? myCards.map(c=>cardHTML(c,{big:true})).join('') : cardBackHTML(true)+cardBackHTML(true)
+      }</div>`;
+    }
+
+    // 현재까지 보이는 카드로 만들 수 있는 최고 족보 (내 카드를 직접 보고 있을 때만 표시 - 안 보이면 정보 유출 방지)
+    let handRankHTML = '';
+    if(localReveal && myCards && revealCount>=3){
+      const visibleCards = [...myCards, ...state.board.slice(0, revealCount)];
+      const ev = bestHandAny(visibleCards);
+      handRankHTML = `<div class="hand-rank-note">현재 족보: ${categoryLabel(ev)}</div>`;
+    }
+
+    const showViewToggle = phase!=='waiting';
+    const isFolded = myStatus==='folded';
+
+    // 나 빼고 모두 폴드했으면(마지막 1명), phase와 상관없이 공개 여부를 바로 정할 수 있게 한다
+    const dealtSeats = state.hands ? Object.keys(state.hands).map(Number) : [];
+    const notFoldedCount = dealtSeats.filter(seat => ((state.status && state.status[seat]) || 'open') !== 'folded').length;
+    const isLastStanding = !isFolded && dealtSeats.length>0 && notFoldedCount===1;
+
+    const showFoldBtn = phase!=='waiting' && phase!=='result' && !isFolded;
+    const showOpenToggle = (phase==='river' || phase==='result' || isLastStanding) && !isFolded;
+    const showFoldRevealToggle = isFolded && phase!=='waiting';
+
+    // 내 포지션 (호스트가 BTN을 지정한 경우에만 표시됨)
+    const myPosition = state.seatOrder && state.buttonSeat
+      ? (computePositions(state.seatOrder, state.buttonSeat)[mySeat] || '')
+      : '';
+
+    app.innerHTML = `
+      <div class="top-bar">
+        <span class="exit-link" id="exitLink">← 나가기</span>
+        <span class="badge-group">
+          <span class="seat-badge">${myName}</span>
+          ${myPosition ? `<span class="position-tag">${myPosition}</span>` : ''}
+        </span>
+        <span style="display:flex; align-items:center; gap:6px;">
+          <button class="icon-btn" id="fsBtn" title="전체화면">⛶</button>
+          <button class="layout-toggle-btn" id="layoutBtn">⤢ ${layoutModeLabel()}</button>
+        </span>
+      </div>
+      <div class="felt-panel game-panel">
+        ${isFolded ? `<div class="fold-banner">🚫 폴드함</div>` : ''}
+        <div class="game-grid">
+          <div class="game-col-left">
+            <div class="board-section">
+              <div class="section-label">커뮤니티 카드<span class="phase-tag">${PHASE_LABEL[phase]}</span></div>
+              <div class="board">${boardHTML(state.board, revealCount)}</div>
+            </div>
+
+            <div class="open-area-section">
+              ${showOpenToggle ? `
+                <div class="open-toggle-wrap">
+                  <div class="label">쇼다운에서 카드를 공개할까요?</div>
+                  <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
+                </div>
+              ` : ''}
+              ${showFoldRevealToggle ? `
+                <div class="open-toggle-wrap">
+                  <div class="label">폴드했지만 카드를 보여줄까요? (승패엔 영향 없음)</div>
+                  <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="fold-area-section">
+              ${showFoldBtn ? `<button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px;">폴드</button>` : ''}
+            </div>
+          </div>
+
+          <div class="game-col-right">
+            <div class="hand-section">
+              <div class="who">내 홀카드</div>
+              ${handRankHTML}
+              ${myCardsHTML}
+              ${showViewToggle ? `<div class="toggle-row"><button class="toggle-btn" id="toggleBtn">${localReveal?'카드 가리기':'내 카드 보기'}</button></div>` : ''}
+            </div>
+          </div>
+        </div>
+
+        ${phase==='waiting' ? `<div class="waiting-note">호스트가 분배를 시작하면<br>홀카드 2장을 받습니다.</div>` : ''}
+        ${isFolded && phase!=='result' ? `<div class="waiting-note">이번 판이 끝날 때까지 기다려주세요.</div>` : ''}
+        ${phase==='result' ? `
+          <div class="waiting-note">게임이 종료됐어요.${isFolded ? '' : ' 공개 여부는 계속 바꿀 수 있어요.'}</div>
+          <button class="view-result-btn" id="viewResultBtn">🂠 결과 보기</button>
+        ` : ''}
+      </div>
+      ${(showResultModal && phase==='result') ? resultModalHTML(state) : ''}
+    `;
+    document.getElementById('exitLink').onclick = ()=>{ location.reload(); };
+    document.getElementById('layoutBtn').onclick = cycleLayoutMode;
+    document.getElementById('fsBtn').onclick = toggleFullscreen;
+    if(showViewToggle){
+      document.getElementById('toggleBtn').onclick = ()=>{ localReveal = !localReveal; render(); };
+    }
+    if(showOpenToggle){
+      document.getElementById('openToggleBtn').onclick = toggleOpenChoice;
+    }
+    if(showFoldBtn){
+      document.getElementById('foldBtn').onclick = doFold;
+    }
+    if(showFoldRevealToggle){
+      document.getElementById('foldRevealBtn').onclick = toggleFoldReveal;
+    }
+    const viewResultBtn = document.getElementById('viewResultBtn');
+    if(viewResultBtn){
+      viewResultBtn.onclick = ()=>{ showResultModal = true; render(); };
+    }
+    const modalOverlay = document.getElementById('resultModalOverlay');
+    if(modalOverlay){
+      const closeModal = ()=>{ showResultModal = false; render(); };
+      document.getElementById('resultModalClose').onclick = closeModal;
+      modalOverlay.onclick = (e)=>{ if(e.target===modalOverlay) closeModal(); };
+    }
+  }
+
+  renderJoinForm();
+})();
+</script>
+</body>
+</html>
