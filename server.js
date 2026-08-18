@@ -1,96 +1,162 @@
-# 홀덤 분배기 (Hold'em Dealer)
+const path = require('path');
+const crypto = require('crypto');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 
-Express + Socket.io로 만든 실시간 홀덤 카드 분배기입니다. 호스트가 방을 만들고,
-플레이어 두 명이 방 코드로 접속해 모바일로 함께 플레이합니다.
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-## 로컬에서 실행해보기
+app.use(express.static(path.join(__dirname, 'public')));
 
-```bash
-npm install
-npm start
-```
+// 참가자용 고정 URL
+app.get('/join', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'join.html'));
+});
 
-브라우저에서 `http://localhost:3000` 접속.
+const MAX_SEATS = 9;
+function emptySeatMap() {
+  const m = {};
+  for (let i = 1; i <= MAX_SEATS; i++) m[i] = null;
+  return m;
+}
 
-## GitHub에 올리기
+// roomId(4자리 코드) -> { hostId, players: {1..9}, names: {1..9}, state: {...} }
+const rooms = {};
 
-1. [github.com](https://github.com) 에서 새 저장소(Repository)를 만듭니다. (Public/Private 상관없음)
-2. 이 폴더를 그 저장소에 올립니다:
+// 헷갈리는 문자(0/O, 1/I) 제외한 4자리 코드
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function genRoomCode() {
+  let code;
+  do {
+    const bytes = crypto.randomBytes(4);
+    code = '';
+    for (let i = 0; i < 4; i++) code += CODE_CHARS[bytes[i] % CODE_CHARS.length];
+  } while (rooms[code]); // 충돌 방지
+  return code;
+}
 
-```bash
-cd holdem-server
-git init
-git add .
-git commit -m "홀덤 분배기 초기 커밋"
-git branch -M main
-git remote add origin https://github.com/<내계정>/<저장소이름>.git
-git push -u origin main
-```
+function emitToHost(room, event, payload) {
+  if (room && room.hostId) io.to(room.hostId).emit(event, payload);
+}
 
-## Render에 배포하기
+io.on('connection', (socket) => {
+  socket.on('create-room', (cb) => {
+    const roomId = genRoomCode();
+    rooms[roomId] = {
+      hostId: socket.id,
+      players: emptySeatMap(),
+      names: emptySeatMap(),
+      state: { phase: 'waiting' },
+    };
+    socket.join(roomId);
+    socket.data.roomId = roomId;
+    socket.data.role = 'host';
+    if (typeof cb === 'function') cb({ ok: true, roomId });
+  });
 
-1. [render.com](https://render.com) 접속 후 GitHub 계정으로 로그인/연동합니다.
-2. 대시보드에서 **New +** → **Web Service** 선택.
-3. 방금 올린 GitHub 저장소를 선택합니다.
-4. 설정값:
-   - **Name**: 원하는 이름 (예: `holdem-dealer`)
-   - **Region**: 아무 곳이나 (한국과 가까운 Singapore 추천)
-   - **Branch**: `main`
-   - **Runtime**: `Node`
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Instance Type**: `Free` (테스트용으로 충분)
-5. **Create Web Service** 클릭 → 몇 분 후 배포 완료.
-6. 완료되면 `https://holdem-dealer-xxxx.onrender.com` 같은 실제 웹 주소가 생깁니다.
-   이 주소를 모바일 브라우저에서 열면 바로 사용 가능합니다.
+  socket.on('join-room', ({ roomId, name }, cb) => {
+    const code = (roomId || '').trim().toUpperCase();
+    const room = rooms[code];
+    if (!room) {
+      if (typeof cb === 'function') cb({ ok: false, error: '입장 코드를 찾을 수 없어요. 다시 확인해주세요.' });
+      return;
+    }
+    if ((room.state.phase || 'waiting') !== 'waiting') {
+      if (typeof cb === 'function') cb({ ok: false, error: '게임이 진행 중이에요. 대기 상태일 때 다시 시도해주세요.' });
+      return;
+    }
+    let seat = null;
+    for (let i = 1; i <= MAX_SEATS; i++) {
+      if (!room.players[i]) { seat = i; break; }
+    }
+    if (!seat) {
+      if (typeof cb === 'function') cb({ ok: false, error: `이미 ${MAX_SEATS}명이 입장한 방이에요.` });
+      return;
+    }
+    const safeName = (name || '').toString().trim().slice(0, 20) || `플레이어${seat}`;
+    room.players[seat] = socket.id;
+    room.names[seat] = safeName;
+    socket.join(code);
+    socket.data.roomId = code;
+    socket.data.role = 'player';
+    socket.data.seat = seat;
 
-> **참고**: Render 무료 플랜은 일정 시간 요청이 없으면 서버가 슬립(sleep) 상태가 되고,
-> 다음 접속 시 깨어나는 데 몇십 초 정도 걸릴 수 있어요. 여러 명이 자주 쓸 계획이면
-> 유료 플랜(Starter 이상)을 고려하세요.
+    if (typeof cb === 'function') cb({ ok: true, seat, state: room.state, names: room.names });
+    emitToHost(room, 'player-joined', { seat, name: safeName });
+  });
 
-## 사용 방법
+  socket.on('host-action', ({ roomId, state }) => {
+    const room = rooms[roomId];
+    if (!room || room.hostId !== socket.id) return;
+    room.state = state;
+    io.to(roomId).emit('state-update', { state: room.state, names: room.names });
+  });
 
-1. 호스트: 웹 링크(`/`) 접속 → "방 만들기" → 화면에 **4자리 참가자 접속 코드**가 표시됨
-2. 참가자: 별도 고정 링크 `/join` 접속 → **이름 → 방 코드** 순서로 입력 → "입장하기" (**최대 9명**까지 입장 가능)
-3. 호스트 화면에 참가자 이름이 실시간으로 표시되고, 각 이름 옆 "내보내기"로 강퇴 가능
-4. **최소 2명 이상** 입장하면 호스트가 "분배 시작"을 누를 수 있음 → 입장한 모든 참가자에게 홀카드 지급 후 플랍/턴/리버까지 진행
-5. **분배 완료 후부터 언제든** 참가자는 "폴드"할 수 있어요. 폴드하면 이번 판이 끝날 때까지 아무것도 할 수 없어요
-6. **리버 단계부터**: 폴드하지 않은 참가자는 "카드를 공개할지" 토글로 선택 가능 (기본값: 공개, 게임 종료 후에도 계속 바꿀 수 있음)
-   - 참가자 화면에는 상대방 카드나 승패 결과가 절대 표시되지 않아요 (본인 카드만 보임)
-   - 플랍/턴/리버 단계에서는 본인 카드를 보고 있을 때 현재 족보도 함께 표시됨
-7. 호스트 화면에는 분배 이후부터 참가자별 상태(폴드/비공개/공개 예정)가 항상 표시되고, **실제 카드는 "게임 종료" 후에만** 공개돼요
-   - **공개를 선택한 사람이 2명 이상일 때만** 그들끼리 비교해서 승자에 WIN 배지 표시 (폴드/비공개 참가자는 원래 패와 상관없이 비교 대상에서 제외)
-   - 공개자가 1명 이하면 승자가 표시되지 않음
-   - "다음 게임"을 누르면 대기 상태로 돌아가 새로 분배 가능 (이때 접속이 끊긴 참가자는 자동으로 정리됨)
-   - **폴드하지 않은 참가자가 1명만 남으면** 즉시 액션 버튼이 "게임 종료"로 바뀌고, 누르면 결과 화면 없이 바로 다음 게임으로 넘어감
-8. 참가자는 **분배 시작 전(대기 상태)에만** 입장 가능. 게임이 진행 중이면 입장이 막힘
-9. 참가자의 연결이 끊기면 호스트 화면에 이름 옆 **"(나감)"**이 회색으로 표시됨 (다음 대기 상태로 돌아갈 때 자동으로 자리가 정리됨)
-10. 호스트는 참가자 목록에서 **BTN(버튼) 위치를 "⋯" 더보기 메뉴로 지정**할 수 있고, 이를 기준으로 SB/BB/UTG 등 홀덤 포지션이 자동 계산되어 호스트와 각 참가자 화면에 표시됨 (2명일 때는 BTN/SB로 표기)
-   - "다음 게임"으로 넘어갈 때마다 버튼이 좌석 순서상 다음 사람에게 자동으로 넘어감
-11. 참가자 목록은 **드래그 앤 드롭으로 순서 변경** 가능 (테이블 착석 순서를 실제와 맞출 때 사용). 드래그 라이브러리 로드에 실패하면 순서 변경 없이 기본 순서로 표시됨
-12. "내보내기"와 "버튼 지정"은 각 참가자 옆 **"⋯" 더보기 메뉴** 안에 있음
-13. **폴드한 참가자도 카드를 공개할 수 있음** (승패 계산에는 영향 없음, 표시 전용). 폴드한 사람의 결과 카드에는 회색 테두리가 표시됨
-14. 폴드하지 않은 참가자가 1명만 남아도 결과 화면으로 넘어가 카드 공개 여부를 선택할 기회를 줌
-15. 호스트 전용 **"모든 카드 보기"** 토글로 게임 중 언제든 전체 참가자의 실제 카드를 미리볼 수 있음 (참가자에게는 보이지 않고, 승패 계산에도 영향 없음)
-16. 호스트 화면은 **접속 코드 → 커뮤니티 카드+진행 버튼 → 참가자별 결과** 순서의 전체 폭 레이아웃으로, 참가자가 많아져도 결과가 그리드로 여러 줄에 나뉘어 표시됨
-17. 참가자 화면은 **모바일 가로모드일 때 자동으로 좌(커뮤니티 카드)/우(내 홀카드) 레이아웃으로 전환**되며, 우측 상단 버튼으로 자동/가로/세로를 수동으로 강제 전환할 수도 있음
-18. 아이폰 Safari는 브라우저 정책상 표준 전체화면 API를 지원하지 않아, 대신 화면을 최대한 채우는 유사 전체화면으로 대체됨 (진짜 전체화면을 원하면 "홈 화면에 추가"로 실행)
-19. 폴드는 확인창 없이 즉시 처리됨
-20. 나를 제외한 모든 참가자가 폴드하면(마지막 1명), 단계(플랍/턴 등)와 상관없이 바로 카드 공개 여부를 선택할 수 있음
-21. 게임 종료 후 참가자 화면에 **"결과 보기"** 버튼이 뜨고, 누르면 공개된 참가자들의 이름/카드/족보/승자를 보여주는 팝업이 뜸 (팝업을 닫으면 원래 화면으로 돌아감)
+  // 참가자가 카드 공개/비공개/폴드 상태를 바꿀 때 -> 호스트에게 전달 (status: 'open'|'closed'|'folded')
+  socket.on('player-set-status', ({ status }) => {
+    const roomId = socket.data.roomId;
+    const seat = socket.data.seat;
+    if (!roomId || !seat) return;
+    const room = rooms[roomId];
+    if (!room) return;
+    emitToHost(room, 'player-status-update', { seat, status });
+  });
 
-## 구조
+  // 폴드한 참가자가 그래도 카드를 공개하고 싶을 때 (승패에는 영향 없음, 표시용)
+  socket.on('player-set-reveal', ({ reveal }) => {
+    const roomId = socket.data.roomId;
+    const seat = socket.data.seat;
+    if (!roomId || !seat) return;
+    const room = rooms[roomId];
+    if (!room) return;
+    emitToHost(room, 'player-reveal-update', { seat, reveal: !!reveal });
+  });
 
-```
-holdem-server/
-├── server.js          # Express + Socket.io 서버 (방 관리, 이름 기반 입장(최대 9명), 상태 중계)
-├── package.json
-├── public/
-│   ├── index.html      # 호스트 화면 (방 생성, 코드 표시, 진행 제어, 가로 레이아웃)
-│   └── join.html       # 참가자 화면 (고정 URL, 코드+이름 입장)
-└── README.md
-```
+  // 호스트가 참가자를 방에서 내보낼 때
+  socket.on('kick-player', ({ roomId, seat }) => {
+    const room = rooms[roomId];
+    if (!room || room.hostId !== socket.id) return;
+    const targetSocketId = room.players[seat];
+    if (!targetSocketId) return;
+    room.players[seat] = null;
+    room.names[seat] = null;
+    const targetSocket = io.sockets.sockets.get(targetSocketId);
+    if (targetSocket) {
+      targetSocket.emit('kicked');
+      targetSocket.disconnect(true);
+    }
+    io.to(roomId).emit('state-update', { state: room.state, names: room.names });
+  });
 
-방 상태는 서버 메모리에만 저장됩니다(DB 없음). 서버가 재시작되면 진행 중이던 방 정보는
-사라지니, 필요하면 이후에 Redis 등으로 영속화할 수 있습니다.
+  socket.on('disconnect', () => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    const room = rooms[roomId];
+    if (!room) return;
 
+    if (socket.data.role === 'host') {
+      io.to(roomId).emit('host-left');
+      delete rooms[roomId];
+    } else if (socket.data.role === 'player') {
+      const seat = socket.data.seat;
+      if (room.players[seat] === socket.id) {
+        room.players[seat] = null;
+        room.names[seat] = null;
+      }
+      emitToHost(room, 'player-left', { seat });
+    }
+  });
+});
+
+// 메모리 누수 방지용 세이프가드
+setInterval(() => {
+  const ids = Object.keys(rooms);
+  if (ids.length > 5000) ids.slice(0, 1000).forEach((id) => delete rooms[id]);
+}, 60 * 60 * 1000);
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`홀덤 분배기 서버 실행 중: http://localhost:${PORT}`);
+});
