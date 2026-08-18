@@ -117,15 +117,12 @@
   }
   .modal-name{ font-weight:700; font-size:13px; flex-shrink:0; min-width:70px; }
   .modal-cards{ display:flex; gap:6px; }
-  .fold-and-result-row{ display:flex; gap:10px; width:100%; }
-  .fold-and-result-row .chip-btn.danger{ flex:8; margin-top:0; }
+  .open-btn-row{ display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
   .view-result-btn{
-    flex:2; padding:12px 8px;
-    border-radius:999px; border:1px solid var(--blue); background:transparent;
-    color:var(--blue-soft); font-weight:700; font-size:13px; cursor:pointer;
-    white-space:nowrap;
+    padding:8px 16px; white-space:nowrap;
+    border-radius:999px; border:1px solid #f97316; background:transparent;
+    color:#fdba74; font-weight:700; font-size:13px; cursor:pointer;
   }
-  .fold-and-result-row .view-result-btn:only-child{ flex:1; }
   .board{ display:flex; gap:7px; justify-content:center; margin-bottom:8px; }
   .card{ width:58px; height:82px; border-radius:8px; background:var(--card-white); position:relative; box-shadow:0 3px 6px rgba(0,0,0,0.5); flex-shrink:0; }
   .card.big{ width:96px; height:136px; }
@@ -196,7 +193,6 @@
   /* 세로모드(기본): 위→아래로 자연스럽게 쌓임 */
   .game-grid{ display:flex; flex-direction:column; gap:10px; }
   .game-grid .open-area-section:empty, .game-grid .fold-area-section:empty{ display:none; }
-  .fold-and-result-row:empty{ display:none; }
 
   /* 가로모드: 좌측(커뮤니티카드/공개유무/폴드) · 우측(내 홀카드+카드보기) 2단 컬럼 */
   @media (orientation:landscape) and (max-height:520px){
@@ -244,7 +240,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v27-modalfix-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v28-btnfix-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -637,7 +633,10 @@
               ${showOpenToggle ? `
                 <div class="open-toggle-wrap">
                   <div class="label">쇼다운에서 카드를 공개할까요?</div>
-                  <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
+                  <div class="open-btn-row">
+                    <button class="open-toggle-btn ${myStatus==='open'?'open':'fold'}" id="openToggleBtn">${myStatus==='open' ? '✓ 공개함' : '✕ 공개안함'}</button>
+                    ${phase==='result' ? `<button class="view-result-btn" id="viewResultBtn">결과보기</button>` : ''}
+                  </div>
                 </div>
               ` : ''}
               ${showFoldRevealToggle ? `
@@ -649,10 +648,7 @@
             </div>
 
             <div class="fold-area-section">
-              <div class="fold-and-result-row">
-                ${showFoldBtn ? `<button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px;">폴드</button>` : ''}
-                ${phase==='result' ? `<button class="view-result-btn" id="viewResultBtn">🂠 결과<br>보기</button>` : ''}
-              </div>
+              ${showFoldBtn ? `<button class="chip-btn danger" id="foldBtn" style="width:auto; padding:10px 24px;">폴드</button>` : ''}
             </div>
           </div>
 
