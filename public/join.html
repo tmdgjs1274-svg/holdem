@@ -99,23 +99,24 @@
     display:flex; align-items:center; justify-content:center; padding:20px;
   }
   .modal-box{
-    width:100%; max-width:420px; max-height:80vh; overflow-y:auto;
+    width:100%; max-width:640px; max-height:85vh; overflow-y:auto;
     background:linear-gradient(180deg, var(--bg-light), var(--bg-mid));
-    border:1px solid rgba(59,130,246,0.4); border-radius:16px; padding:18px;
+    border:1px solid rgba(59,130,246,0.4); border-radius:16px; padding:24px;
   }
   .modal-header{
     display:flex; justify-content:space-between; align-items:center;
-    font-family:'Noto Serif KR', serif; font-weight:700; font-size:17px; color:var(--blue-soft);
-    margin-bottom:14px;
+    font-family:'Noto Serif KR', serif; font-weight:700; font-size:19px; color:var(--blue-soft);
+    margin-bottom:18px;
   }
   .modal-close{
-    background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:2px 6px;
+    background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:2px 6px;
   }
+  .modal-body{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .modal-row{
-    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-    padding:10px; border-radius:10px; background:rgba(0,0,0,0.2); margin-bottom:8px;
+    display:flex; flex-direction:column; align-items:flex-start; gap:8px;
+    padding:14px; border-radius:12px; background:rgba(0,0,0,0.2);
   }
-  .modal-name{ font-weight:700; font-size:13px; flex-shrink:0; min-width:70px; }
+  .modal-name{ font-weight:700; font-size:14px; }
   .modal-cards{ display:flex; gap:6px; }
   .open-btn-row{ display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
   .view-result-btn{
@@ -240,7 +241,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v28-btnfix-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v30-modal2col-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -352,7 +353,7 @@
     const { winners, evals } = computeWinnersJoin(state);
 
     const rows = seats.map(seat=>{
-      const st = status[seat] || 'open';
+      const st = status[seat] || 'closed';
       const isMe = seat===mySeat;
       const displayName = (names[seat] || `${seat}번`) + (isMe ? ' (나)' : '');
       const foldRevealed = st==='folded' && !!reveal[seat];
@@ -443,7 +444,7 @@
   let names = {1:null, 2:null};
   let lastState = {phase:'waiting'};
   let localReveal = false;   // 내 카드 보기/가리기 (순전히 로컬, 프라이버시용)
-  let myStatus = 'open';     // 'open'|'closed'|'folded' - 서버로 전송됨
+  let myStatus = 'closed';     // 'open'|'closed'|'folded' - 서버로 전송됨
   let myFoldReveal = false;  // 폴드했어도 카드를 보여줄지 (승패엔 영향 없음)
   let joinError = '';
   let showResultModal = false;
@@ -515,7 +516,7 @@
           joined = true; mySeat = res.seat; myName = name;
           lastState = res.state || {phase:'waiting'};
           names = res.names || {1:null,2:null};
-          myStatus = (lastState.status && lastState.status[mySeat]) || 'open';
+          myStatus = (lastState.status && lastState.status[mySeat]) || 'closed';
           render();
         } else {
           joinError = (res && res.error) ? res.error : '입장 실패';
@@ -533,7 +534,7 @@
     if(lastState.status && lastState.status[mySeat]) myStatus = lastState.status[mySeat];
     if(lastState.reveal && typeof lastState.reveal[mySeat] !== 'undefined') myFoldReveal = !!lastState.reveal[mySeat];
     // "다음 게임"을 눌러 대기 상태로 돌아가면 status/reveal 필드 자체가 없으므로, 여기서 명시적으로 리셋해준다
-    if(lastState.phase==='waiting'){ myStatus = 'open'; myFoldReveal = false; showResultModal = false; }
+    if(lastState.phase==='waiting'){ myStatus = 'closed'; myFoldReveal = false; showResultModal = false; }
     if(joined) render();
   });
   socket.on('host-left', ()=>{
@@ -642,7 +643,15 @@
               ${showFoldRevealToggle ? `
                 <div class="open-toggle-wrap">
                   <div class="label">폴드했지만 카드를 보여줄까요? (승패엔 영향 없음)</div>
-                  <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
+                  <div class="open-btn-row">
+                    <button class="open-toggle-btn ${myFoldReveal?'open':'fold'}" id="foldRevealBtn">${myFoldReveal ? '✓ 공개함' : '✕ 공개안함'}</button>
+                    ${phase==='result' ? `<button class="view-result-btn" id="viewResultBtn">결과보기</button>` : ''}
+                  </div>
+                </div>
+              ` : ''}
+              ${(!showOpenToggle && !showFoldRevealToggle && phase==='result') ? `
+                <div class="open-toggle-wrap">
+                  <button class="view-result-btn" id="viewResultBtn">결과보기</button>
                 </div>
               ` : ''}
             </div>

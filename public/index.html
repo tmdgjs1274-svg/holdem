@@ -99,12 +99,13 @@
   .more-dropdown{
     position:absolute; right:0; top:100%; margin-top:4px; background:var(--bg-mid);
     border:1px solid rgba(59,130,246,0.4); border-radius:8px; padding:4px; z-index:20;
-    min-width:90px; box-shadow:0 4px 12px rgba(0,0,0,0.5);
+    min-width:120px; box-shadow:0 4px 12px rgba(0,0,0,0.5);
   }
   .more-dropdown button{
     display:block; width:100%; text-align:left; background:none; border:none; color:#ffb4b4;
-    font-size:12px; padding:8px 10px; border-radius:6px; cursor:pointer;
+    font-size:12px; padding:8px 10px; border-radius:6px; cursor:pointer; white-space:nowrap;
   }
+  .more-dropdown button.btn-action{ color:var(--lime-soft-text); }
   .more-dropdown button:hover{ background:rgba(255,255,255,0.06); }
   .sortable-ghost{ opacity:0.35; }
   .icon-btn{
@@ -182,7 +183,7 @@
 <body>
 
 <div id="app" class="host-app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v21-badgefix-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v22-menufix-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -214,7 +215,7 @@
     seats.forEach(seat=>{ hands[seat] = [deck[idx++], deck[idx++]]; });
     const board = deck.slice(idx, idx+5);
     const status = {};
-    seats.forEach(seat=>{ status[seat] = 'open'; }); // 'open'|'closed'|'folded', 기본은 공개
+    seats.forEach(seat=>{ status[seat] = 'closed'; }); // 'open'|'closed'|'folded', 기본은 비공개
     return { phase:'dealt', hands, board, status };
   }
   function parseCard(str){ return {rank:RANK_VALUE[str[0]], suit:str[1]}; }
@@ -649,7 +650,7 @@
         const dropdown = document.createElement('div');
         dropdown.className = 'more-dropdown';
         dropdown.innerHTML = `
-          <button data-setbtn="${seat}">${isButton ? '버튼 해제' : '버튼으로 지정'}</button>
+          <button class="btn-action" data-setbtn="${seat}">${isButton ? '버튼 해제' : '버튼으로 지정'}</button>
           <button data-kick="${seat}">내보내기</button>
         `;
         el.parentElement.appendChild(dropdown);
