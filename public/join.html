@@ -35,6 +35,10 @@
     justify-content:center;
     padding:0;
   }
+  body.pseudo-fullscreen{
+    position:fixed; inset:0; width:100vw; height:100vh; height:100dvh;
+    overflow-y:auto; z-index:9999;
+  }
   #app{
     width:100%;
     max-width:440px;
@@ -89,6 +93,33 @@
     text-align:center; font-family:'Noto Serif KR', serif; font-weight:700; font-size:22px;
     letter-spacing:0.1em; color:#e5e7eb; background:rgba(255,255,255,0.08);
     border:1px solid rgba(255,255,255,0.25); border-radius:12px; padding:14px; margin-bottom:16px;
+  }
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:5000;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-box{
+    width:100%; max-width:420px; max-height:80vh; overflow-y:auto;
+    background:linear-gradient(180deg, var(--bg-light), var(--bg-mid));
+    border:1px solid rgba(59,130,246,0.4); border-radius:16px; padding:18px;
+  }
+  .modal-header{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Noto Serif KR', serif; font-weight:700; font-size:17px; color:var(--blue-soft);
+    margin-bottom:14px;
+  }
+  .modal-close{
+    background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:2px 6px;
+  }
+  .modal-row{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:10px; border-radius:10px; background:rgba(0,0,0,0.2); margin-bottom:8px;
+  }
+  .modal-name{ font-weight:700; font-size:13px; flex-shrink:0; min-width:70px; }
+  .view-result-btn{
+    display:block; width:100%; margin-top:10px; padding:12px 18px;
+    border-radius:999px; border:1px solid var(--blue); background:transparent;
+    color:var(--blue-soft); font-weight:700; font-size:14px; cursor:pointer;
   }
   .board{ display:flex; gap:7px; justify-content:center; margin-bottom:8px; }
   .card{ width:58px; height:82px; border-radius:8px; background:var(--card-white); position:relative; box-shadow:0 3px 6px rgba(0,0,0,0.5); flex-shrink:0; }
@@ -205,7 +236,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v25-centerheader-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v26-features-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -294,6 +325,64 @@
     return CATEGORY_NAMES[ev.category];
   }
 
+  // 공개(open)한 사람이 2명 이상일 때만 그들끼리 비교, 1명뿐이면 자동 승리 (호스트와 동일 규칙)
+  // 폴드 후 공개(참고용)는 승패 계산에 포함하지 않는다
+  function computeWinnersJoin(state){
+    const seats = state.hands ? Object.keys(state.hands).map(Number) : [];
+    const status = state.status || {};
+    const openSeats = seats.filter(seat=> status[seat]==='open');
+    const evals = {};
+    seats.forEach(seat=>{ evals[seat] = bestHandAny([...state.hands[seat], ...state.board]); });
+    if(openSeats.length===0) return { winners: [], evals };
+    if(openSeats.length===1) return { winners: [openSeats[0]], evals };
+    let bestEv = null;
+    openSeats.forEach(seat=>{ if(!bestEv || compareEval(evals[seat], bestEv)>0) bestEv = evals[seat]; });
+    const winners = openSeats.filter(seat=> compareEval(evals[seat], bestEv)===0);
+    return { winners, evals };
+  }
+
+  function resultModalHTML(state){
+    const seats = state.hands ? Object.keys(state.hands).map(Number).sort((a,b)=>a-b) : [];
+    const status = state.status || {};
+    const reveal = state.reveal || {};
+    const { winners, evals } = computeWinnersJoin(state);
+
+    const rows = seats.map(seat=>{
+      const st = status[seat] || 'open';
+      const isMe = seat===mySeat;
+      const displayName = (names[seat] || `${seat}번`) + (isMe ? ' (나)' : '');
+      const foldRevealed = st==='folded' && !!reveal[seat];
+      const isOpen = st==='open' || foldRevealed;
+      if(!isOpen){
+        const label = st==='folded' ? '폴드' : '비공개';
+        return `<div class="modal-row"><span class="modal-name">${displayName}</span><span class="win-tag fold">${label}</span></div>`;
+      }
+      const isWinner = winners.includes(seat);
+      const label = categoryLabel(evals[seat]);
+      const cardsHTML = state.hands[seat].map(c=>cardHTML(c)).join('');
+      return `
+        <div class="modal-row">
+          <span class="modal-name">${displayName}</span>
+          <span class="cards" style="gap:6px;">${cardsHTML}</span>
+          <span class="win-tag category">${label}</span>
+          ${isWinner ? `<span class="win-tag win">WIN</span>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="modal-overlay" id="resultModalOverlay">
+        <div class="modal-box">
+          <div class="modal-header">
+            <span>게임 결과</span>
+            <button class="modal-close" id="resultModalClose">✕</button>
+          </div>
+          <div class="modal-body">${rows}</div>
+        </div>
+      </div>
+    `;
+  }
+
   function cardHTML(cardStr, opts){
     opts = opts||{};
     const big = opts.big ? ' big' : '';
@@ -353,6 +442,7 @@
   let myStatus = 'open';     // 'open'|'closed'|'folded' - 서버로 전송됨
   let myFoldReveal = false;  // 폴드했어도 카드를 보여줄지 (승패엔 영향 없음)
   let joinError = '';
+  let showResultModal = false;
   let layoutMode = 'auto'; // 'auto'|'landscape'|'portrait'
 
   function applyLayoutMode(){
@@ -360,7 +450,19 @@
     if(layoutMode==='landscape') document.body.classList.add('mode-landscape');
     if(layoutMode==='portrait') document.body.classList.add('mode-portrait');
   }
+  let pseudoFullscreen = false; // iOS Safari 폴백 (CSS로 화면을 꽉 채움)
+  function supportsRealFullscreen(){
+    const el = document.documentElement;
+    return !!(el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen);
+  }
   function toggleFullscreen(){
+    if(!supportsRealFullscreen()){
+      // iOS Safari 등: 표준 Fullscreen API 미지원 -> CSS로 화면을 최대한 채우는 방식으로 대체
+      pseudoFullscreen = !pseudoFullscreen;
+      document.body.classList.toggle('pseudo-fullscreen', pseudoFullscreen);
+      render();
+      return;
+    }
     if(!document.fullscreenElement){
       document.documentElement.requestFullscreen().catch(()=>{});
     } else {
@@ -427,7 +529,7 @@
     if(lastState.status && lastState.status[mySeat]) myStatus = lastState.status[mySeat];
     if(lastState.reveal && typeof lastState.reveal[mySeat] !== 'undefined') myFoldReveal = !!lastState.reveal[mySeat];
     // "다음 게임"을 눌러 대기 상태로 돌아가면 status/reveal 필드 자체가 없으므로, 여기서 명시적으로 리셋해준다
-    if(lastState.phase==='waiting'){ myStatus = 'open'; myFoldReveal = false; }
+    if(lastState.phase==='waiting'){ myStatus = 'open'; myFoldReveal = false; showResultModal = false; }
     if(joined) render();
   });
   socket.on('host-left', ()=>{
@@ -452,7 +554,6 @@
   }
   function doFold(){
     if(myStatus==='folded') return;
-    if(!confirm('폴드하면 이번 판이 끝날 때까지 아무것도 할 수 없어요. 폴드할까요?')) return;
     setStatus('folded');
   }
   function toggleFoldReveal(){
@@ -488,8 +589,14 @@
 
     const showViewToggle = phase!=='waiting';
     const isFolded = myStatus==='folded';
+
+    // 나 빼고 모두 폴드했으면(마지막 1명), phase와 상관없이 공개 여부를 바로 정할 수 있게 한다
+    const dealtSeats = state.hands ? Object.keys(state.hands).map(Number) : [];
+    const notFoldedCount = dealtSeats.filter(seat => ((state.status && state.status[seat]) || 'open') !== 'folded').length;
+    const isLastStanding = !isFolded && dealtSeats.length>0 && notFoldedCount===1;
+
     const showFoldBtn = phase!=='waiting' && phase!=='result' && !isFolded;
-    const showOpenToggle = (phase==='river' || phase==='result') && !isFolded;
+    const showOpenToggle = (phase==='river' || phase==='result' || isLastStanding) && !isFolded;
     const showFoldRevealToggle = isFolded && phase!=='waiting';
 
     // 내 포지션 (호스트가 BTN을 지정한 경우에만 표시됨)
@@ -550,8 +657,12 @@
 
         ${phase==='waiting' ? `<div class="waiting-note">호스트가 분배를 시작하면<br>홀카드 2장을 받습니다.</div>` : ''}
         ${isFolded && phase!=='result' ? `<div class="waiting-note">이번 판이 끝날 때까지 기다려주세요.</div>` : ''}
-        ${phase==='result' ? `<div class="waiting-note">게임이 종료됐어요.${isFolded ? '' : ' 공개 여부는 계속 바꿀 수 있어요.'}<br>결과는 진행자 화면에서 확인할 수 있어요.</div>` : ''}
+        ${phase==='result' ? `
+          <div class="waiting-note">게임이 종료됐어요.${isFolded ? '' : ' 공개 여부는 계속 바꿀 수 있어요.'}</div>
+          <button class="view-result-btn" id="viewResultBtn">🂠 결과 보기</button>
+        ` : ''}
       </div>
+      ${(showResultModal && phase==='result') ? resultModalHTML(state) : ''}
     `;
     document.getElementById('exitLink').onclick = ()=>{ location.reload(); };
     document.getElementById('layoutBtn').onclick = cycleLayoutMode;
@@ -567,6 +678,16 @@
     }
     if(showFoldRevealToggle){
       document.getElementById('foldRevealBtn').onclick = toggleFoldReveal;
+    }
+    const viewResultBtn = document.getElementById('viewResultBtn');
+    if(viewResultBtn){
+      viewResultBtn.onclick = ()=>{ showResultModal = true; render(); };
+    }
+    const modalOverlay = document.getElementById('resultModalOverlay');
+    if(modalOverlay){
+      const closeModal = ()=>{ showResultModal = false; render(); };
+      document.getElementById('resultModalClose').onclick = closeModal;
+      modalOverlay.onclick = (e)=>{ if(e.target===modalOverlay) closeModal(); };
     }
   }
 
