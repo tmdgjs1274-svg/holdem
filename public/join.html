@@ -241,7 +241,7 @@
 <body>
 
 <div id="app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v30-modal2col-join</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v31-qrprefill-join</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -486,6 +486,7 @@
   const app = document.getElementById('app');
 
   function renderJoinForm(){
+    const prefillCode = new URLSearchParams(location.search).get('code') || '';
     app.innerHTML = `
       <div class="brand">
         <div class="mark" style="font-size:22px;">참가자 화면</div>
@@ -498,11 +499,15 @@
         <input type="text" id="nameInput" class="name-input" maxlength="20" placeholder="예: 승헌">
         <div class="hairline"></div>
         <span class="field-label">방 코드</span>
-        <input type="text" id="codeInput" maxlength="4" placeholder="예: A1B2">
+        <input type="text" id="codeInput" maxlength="4" placeholder="예: A1B2" value="${prefillCode.toUpperCase()}">
         <button class="chip-btn" id="joinBtn">입장하기</button>
         <div class="err-msg" id="joinErr">${joinError||''}</div>
       </div>
     `;
+    if(prefillCode){
+      const nameEl = document.getElementById('nameInput');
+      if(nameEl) nameEl.focus();
+    }
     document.getElementById('joinBtn').onclick = ()=>{
       const name = document.getElementById('nameInput').value.trim();
       const code = document.getElementById('codeInput').value.trim().toUpperCase();

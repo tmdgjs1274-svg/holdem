@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js" onerror="window.__sortableLoadFailed=true"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onerror="window.__qrLoadFailed=true"></script>
 
 <style>
   :root{
@@ -94,6 +95,25 @@
   .position-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--lime-soft-bg); color:var(--lime-soft-text); letter-spacing:0.05em; }
   .btn-dot{ display:inline-block; width:11px; height:11px; border-radius:50%; background:var(--green-strong); box-shadow:0 0 0 2px rgba(22,163,74,0.35); vertical-align:middle; }
   .code-inline{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:14px; letter-spacing:0.1em; color:var(--blue-soft); margin-left:4px; }
+  .room-qr-thumb{
+    width:36px; height:36px; background:var(--card-white); border-radius:6px; padding:2px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .room-qr-thumb img, .room-qr-thumb canvas{ width:100%; height:100%; }
+  .qr-modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:5000;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .qr-modal-box{
+    background:var(--card-white); border-radius:16px; padding:24px;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  .qr-modal-box .code-big{
+    font-family:'Noto Serif KR', serif; font-weight:700; font-size:26px; letter-spacing:0.12em; color:var(--ink);
+  }
+  .qr-modal-close{
+    background:none; border:none; color:var(--muted); font-size:12px; cursor:pointer; text-decoration:underline;
+  }
   .more-menu-wrap{ position:relative; }
   .more-btn{ background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 6px; line-height:1; }
   .more-dropdown{
@@ -183,7 +203,7 @@
 <body>
 
 <div id="app" class="host-app"></div>
-<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v22-menufix-host</div>
+<div style="position:fixed; bottom:4px; right:8px; font-size:9px; color:rgba(245,247,251,0.25); font-family:monospace; z-index:999;">build v24-nocopybtn-host</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -358,6 +378,25 @@
   // ---------- app state ----------
   let roomId = '';
   let hostRevealAll = false; // 호스트 전용: 모든 참가자 카드 미리보기 (참가자에겐 영향 없음, 승패 계산에도 영향 없음)
+  let showQRModal = false;
+
+  function joinUrl(){
+    return `${location.origin}/join?code=${encodeURIComponent(roomId)}`;
+  }
+  function renderQRInto(elId, size){
+    const el = document.getElementById(elId);
+    if(!el) return;
+    if(typeof QRCode === 'undefined'){
+      el.innerHTML = `<span style="font-size:9px; color:#888; text-align:center;">QR 실패</span>`;
+      return;
+    }
+    el.innerHTML = '';
+    try{
+      new QRCode(el, { text: joinUrl(), width:size, height:size, colorDark:'#0a1020', colorLight:'#f5f7fb' });
+    }catch(e){
+      el.innerHTML = `<span style="font-size:9px; color:#888;">QR 실패</span>`;
+    }
+  }
   let names = {}; // 1..MAX_SEATS, null이면 미입장
   let left = {};  // seat -> true 면 접속 끊김(나감), 다음 대기 상태로 돌아갈 때 정리됨
   for(let i=1;i<=MAX_SEATS;i++) names[i] = null;
@@ -609,7 +648,7 @@
     }
 
     const actionLabel = onlyOneLeft ? '게임 종료' : NEXT_ACTION_LABEL[phase];
-    const codeHTML = `<span class="code-inline">${roomId}</span><button class="copy-btn" id="copyRoomBtn" style="margin-top:0; padding:4px 10px; font-size:10px;">코드 복사</button>`;
+    const codeHTML = `<span class="code-inline">${roomId}</span><div class="room-qr-thumb" id="roomQrThumb" title="QR 크게 보기"></div>`;
 
     app.innerHTML = `
       ${topBarHTML('진행자 화면', codeHTML)}
@@ -635,6 +674,15 @@
         </div>
         ${joinedCount()===0 ? `<div class="waiting-note" style="padding:8px 0;">참가자가 입장 코드로 입장할 때까지 기다려주세요.</div>` : ''}
       </div>
+      ${showQRModal ? `
+        <div class="qr-modal-overlay" id="qrModalOverlay">
+          <div class="qr-modal-box">
+            <div class="code-big">${roomId}</div>
+            <div id="qrModalCanvas" style="width:220px; height:220px;"></div>
+            <button class="qr-modal-close" id="qrModalClose">닫기</button>
+          </div>
+        </div>
+      ` : ''}
     `;
     bindTopBar();
 
@@ -678,11 +726,18 @@
     if(revealAllBtn){
       revealAllBtn.onclick = ()=>{ hostRevealAll = !hostRevealAll; render(); };
     }
-    document.getElementById('copyRoomBtn').onclick = async ()=>{
-      const btn = document.getElementById('copyRoomBtn');
-      try{ await navigator.clipboard.writeText(roomId); btn.textContent='복사됨'; setTimeout(()=>{ if(btn) btn.textContent='코드 복사'; }, 1500); }
-      catch(e){}
-    };
+    renderQRInto('roomQrThumb', 36);
+    const qrThumb = document.getElementById('roomQrThumb');
+    if(qrThumb){
+      qrThumb.onclick = ()=>{ showQRModal = true; render(); };
+    }
+    if(showQRModal){
+      renderQRInto('qrModalCanvas', 220);
+      const qrOverlay = document.getElementById('qrModalOverlay');
+      const closeQr = ()=>{ showQRModal = false; render(); };
+      document.getElementById('qrModalClose').onclick = closeQr;
+      qrOverlay.onclick = (e)=>{ if(e.target===qrOverlay) closeQr(); };
+    }
     const actionBtn = document.getElementById('actionBtn');
     if(actionBtn){
       actionBtn.onclick = ()=>{
